@@ -1,5 +1,7 @@
 # Travelers Policyholder Call
 
+The objective was to develop a predictive model to forecast the number of times policyholders are likely to call, helping CloverShield Insurance optimize call center resource allocation.
+
 
 
 ## Getting started
