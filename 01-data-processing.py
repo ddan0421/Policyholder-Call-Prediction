@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import duckdb
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.neighbors import KNeighborsClassifier
 import os
 
 """
@@ -27,6 +29,7 @@ random_state = 42
 # Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
 def non_auto(data):
     conn = duckdb.connect()
+    conn.register("data", data)
     nonauto_query = """
         WITH cte AS (
             SELECT * FROM data 
@@ -41,6 +44,7 @@ def non_auto(data):
 
 def auto(data):
     conn = duckdb.connect()
+    conn.register("data", data)
     auto_query = """
         SELECT * FROM data 
         WHERE bi_limit_group != 'NonAuto' AND newest_veh_age != -20 AND telematics_ind != -2;
@@ -61,10 +65,13 @@ X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_st
 # Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 and -1 as missing), telematics_ind (-1 as missing)
 
 # Prepare data for imputing acq_method using KNN
-def knn_prep(X, y):
-    data = pd.concat([X, y], axis=1)
+def knn_prep(X):
+    data = X.copy()
     data["index"] = X.index
+
     conn = duckdb.connect()
+    conn.register("data", data)
+    
     query = """
     CREATE OR REPLACE TABLE knn_prep AS
         SELECT 
@@ -76,12 +83,13 @@ def knn_prep(X, y):
             newest_veh_age,
             tenure_at_snapshot,
             trm_len_mo,
-            CAST(CASE WHEN acq_method = 'method1' THEN 1
-            WHEN acq_method = 'method2' THEN 2
-            WHEN acq_method = 'method3' THEN 3
-            WHEN acq_method = 'method4' THEN 4
-            ELSE NULL 
-                END AS INTEGER) AS acq_method_encoded
+            CAST(CASE 
+                WHEN acq_method = 'method1' THEN 1
+                WHEN acq_method = 'method2' THEN 2
+                WHEN acq_method = 'method3' THEN 3
+                WHEN acq_method = 'method4' THEN 4
+                ELSE NULL 
+            END AS INTEGER) AS acq_method_encoded
         FROM data;
     """
     conn.execute(query)
@@ -97,31 +105,27 @@ def knn_prep(X, y):
     train = conn.execute(train).fetch_df()
     test = conn.execute(test).fetch_df()
 
-    X_train = train.drop("acq_method_encoded", axis=1)
-    y_train = train[["index","acq_method_encoded"]]
+    X_train = train.drop(["acq_method_encoded", "index"], axis=1)
+    y_train = train[["index","acq_method_encoded"]] # has values for the target
 
-    X_test = test.drop("acq_method_encoded", axis=1)
-    y_test = test[["index","acq_method_encoded"]]
+    X_test = test.drop(["acq_method_encoded", "index"], axis=1)
+    y_test = test[["index","acq_method_encoded"]] # need to be imputed
+
+    scaler = MinMaxScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+
     return X_train, y_train, X_test, y_test
 
-X_train_knn, y_train_knn, X_test_knn, y_test_knn = knn_prep(X_train, y_train)
 
-
-# Impute X_train acq_method
-from sklearn.neighbors import KNeighborsClassifier
-
-knn_imputer = KNeighborsClassifier(n_neighbors=5)  # you can tune this
-knn_imputer.fit(X_train_knn.drop("index", axis=1), y_train_knn["acq_method_encoded"].values)
-y_pred = knn_imputer.predict(X_test_knn.drop("index", axis=1))
-
-y_test_knn["acq_method_encoded"] = y_pred
-
-acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
-
-def impute_df(X):
+def impute_df(X, acq_method_imputed):
     X = X.copy()
-    conn = duckdb.connect()
     X["index"] = X.index
+
+    conn = duckdb.connect()
+    conn.register("X", X)
+    conn.register("acq_method_imputed", acq_method_imputed)
+
     query = """
     WITH cte AS (SELECT 
         a.*,
@@ -139,27 +143,49 @@ def impute_df(X):
     FROM X AS a
     LEFT JOIN acq_method_imputed AS b
     ON a.index = b.index)
-
-    SELECT * EXCLUDE (acq_method)
-    FROM cte;
+    SELECT * FROM cte;
+    --SELECT * EXCLUDE (acq_method)
+    --FROM cte;
     """
     X_final = conn.execute(query).fetch_df()
     X_final.set_index("index", inplace=True)
     conn.close()
     return X_final
 
-X_train_final = impute_df(X_train)
+
+
+# Impute X_train acq_method
+X_train_knn, y_train_knn, X_test_knn, y_test_knn = knn_prep(X_train)
+
+# Train KNNClassifier imputer
+knn_imputer = KNeighborsClassifier(n_neighbors=5)  # you can tune this
+knn_imputer.fit(X_train_knn, y_train_knn["acq_method_encoded"].values)
+
+y_pred = knn_imputer.predict(X_test_knn)
+y_test_knn["acq_method_encoded"] = y_pred
+acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
+
+X_train_final = impute_df(X_train, acq_method_imputed)
 
 
 
 # Impute X_val acq_method
-_, y_train_knn, X_val_knn, y_val_knn = knn_prep(X_val, y_val)
-y_pred = knn_imputer.predict(X_val_knn.drop("index", axis=1))
-y_val_knn["acq_method_encoded"] = y_pred
+_, y_train_knn, X_test_knn, y_test_knn = knn_prep(X_val)
+y_pred = knn_imputer.predict(X_test_knn)
+y_test_knn["acq_method_encoded"] = y_pred
+acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
 
-acq_method_imputed = pd.concat([y_train_knn, y_val_knn], axis=0)
-
-X_val_final = impute_df(X_val)
+X_val_final = impute_df(X_val, acq_method_imputed)
 
 # Impute test acq_method
+_, y_train_knn, X_test_knn, y_test_knn = knn_prep(test)
+y_pred = knn_imputer.predict(X_test_knn)
+y_test_knn["acq_method_encoded"] = y_pred
+acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
 
+test_final = impute_df(test, acq_method_imputed)
+
+
+X_train_final.to_csv("train_checking.csv")
+X_val_final.to_csv("val_checking.csv")
+test_final.to_csv("testing.csv")
