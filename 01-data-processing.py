@@ -4,42 +4,162 @@ import duckdb
 from sklearn.model_selection import train_test_split
 import os
 
+"""
+Data Processing
+Step 1: split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
+Step 2: split train into train and validation
+Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 and -1 as missing), telematics_ind (-1 as missing)
+- Training data: NonAuto Train, Auto Train
+- Validation data: NonAuto Val, Auto Val
+- Test: NonAuto Test, Auto Test
+** Use NonAuto Train to train KNN to impute NonAuto Train, NonAuto Val, and NonAuto Test
+** Use Auto Train to train KNN to impute Auto Train, Auto Val, and Auto Test
+Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical)
+** Remember to reindex the validation and test sets to match the one-hot encoded columns of the training set. X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
+Step 5: Scale Numerical (normalization or standardization) for train and use the same mean and st dev for validation and test sets
+
+"""
 train = pd.read_csv("data/train_data.csv")
 test = pd.read_csv("data/test_data.csv")
 
 random_state = 42
 
 # Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
-conn = duckdb.connect()
+def non_auto(data):
+    conn = duckdb.connect()
+    nonauto_query = """
+        WITH cte AS (
+            SELECT * FROM data 
+            WHERE bi_limit_group = 'NonAuto' AND newest_veh_age = -20 AND telematics_ind = -2
+        )
+        SELECT * EXCLUDE (bi_limit_group, newest_veh_age, telematics_ind)
+        FROM cte;
+    """
+    df = conn.execute(nonauto_query).fetch_df()
+    conn.close()
+    return df 
 
-nonauto_query = """
-    WITH cte AS (
-        SELECT * FROM train 
-        WHERE bi_limit_group = 'NonAuto' AND newest_veh_age = -20 AND telematics_ind = -2
-    )
-    SELECT * EXCLUDE (bi_limit_group, newest_veh_age, telematics_ind)
-    FROM cte;
-"""
+def auto(data):
+    conn = duckdb.connect()
+    auto_query = """
+        SELECT * FROM data 
+        WHERE bi_limit_group != 'NonAuto' AND newest_veh_age != -20 AND telematics_ind != -2;
+    """
+    df = conn.execute(auto_query).fetch_df()
+    conn.close()
+    return df
 
-nonauto_df = conn.execute(nonauto_query).fetch_df()
+auto_train = auto(train)
+non_auto_train = non_auto(train)
 
-
-auto_query = """
-    SELECT * FROM train 
-    WHERE bi_limit_group != 'NonAuto' AND newest_veh_age != -20 AND telematics_ind != -2;
-"""
-
-auto_df = conn.execute(auto_query).fetch_df()
-
-conn.close()
-
-# Step 2: Split train into train and validation
-X = train.drop("call_counts", axis=1)
-y = train["call_counts"]
+# Step 2: Split train into train and validation (Auto)
+X = auto_train.drop(["call_counts" , "id"], axis=1)
+y = auto_train["call_counts"]
 
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=random_state)
 
+# Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 and -1 as missing), telematics_ind (-1 as missing)
+
+# Prepare data for imputing acq_method using KNN
+def knn_prep(X, y):
+    data = pd.concat([X, y], axis=1)
+    data["index"] = X.index
+    conn = duckdb.connect()
+    query = """
+    CREATE OR REPLACE TABLE knn_prep AS
+        SELECT 
+            index, -- keeping track of index
+            "12m_call_history",
+            ann_prm_amt,
+            home_lot_sq_footage,
+            household_policy_counts,
+            newest_veh_age,
+            tenure_at_snapshot,
+            trm_len_mo,
+            CAST(CASE WHEN acq_method = 'method1' THEN 1
+            WHEN acq_method = 'method2' THEN 2
+            WHEN acq_method = 'method3' THEN 3
+            WHEN acq_method = 'method4' THEN 4
+            ELSE NULL 
+                END AS INTEGER) AS acq_method_encoded
+        FROM data;
+    """
+    conn.execute(query)
+    train = """
+        SELECT * FROM knn_prep
+        WHERE acq_method_encoded IS NOT NULL;
+    """
+    test = """
+        SELECT * FROM knn_prep
+        WHERE acq_method_encoded IS NULL;
+    """
+
+    train = conn.execute(train).fetch_df()
+    test = conn.execute(test).fetch_df()
+
+    X_train = train.drop("acq_method_encoded", axis=1)
+    y_train = train[["index","acq_method_encoded"]]
+
+    X_test = test.drop("acq_method_encoded", axis=1)
+    y_test = test[["index","acq_method_encoded"]]
+    return X_train, y_train, X_test, y_test
+
+X_train_knn, y_train_knn, X_test_knn, y_test_knn = knn_prep(X_train, y_train)
+
+
+# Impute X_train acq_method
+from sklearn.neighbors import KNeighborsClassifier
+
+knn_imputer = KNeighborsClassifier(n_neighbors=5)  # you can tune this
+knn_imputer.fit(X_train_knn.drop("index", axis=1), y_train_knn["acq_method_encoded"].values)
+y_pred = knn_imputer.predict(X_test_knn.drop("index", axis=1))
+
+y_test_knn["acq_method_encoded"] = y_pred
+
+acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
+
+def impute_df(X):
+    X = X.copy()
+    conn = duckdb.connect()
+    X["index"] = X.index
+    query = """
+    WITH cte AS (SELECT 
+        a.*,
+        CASE 
+            WHEN a.acq_method = 'missing' THEN 
+                CASE 
+                    WHEN b.acq_method_encoded = 1 THEN 'method1'
+                    WHEN b.acq_method_encoded = 2 THEN 'method2'
+                    WHEN b.acq_method_encoded = 3 THEN 'method3'
+                    WHEN b.acq_method_encoded = 4 THEN 'method4'
+                    ELSE NULL
+                END
+            ELSE a.acq_method
+        END AS acq_method_filled
+    FROM X AS a
+    LEFT JOIN acq_method_imputed AS b
+    ON a.index = b.index)
+
+    SELECT * EXCLUDE (acq_method)
+    FROM cte;
+    """
+    X_final = conn.execute(query).fetch_df()
+    X_final.set_index("index", inplace=True)
+    conn.close()
+    return X_final
+
+X_train_final = impute_df(X_train)
 
 
 
+# Impute X_val acq_method
+_, y_train_knn, X_val_knn, y_val_knn = knn_prep(X_val, y_val)
+y_pred = knn_imputer.predict(X_val_knn.drop("index", axis=1))
+y_val_knn["acq_method_encoded"] = y_pred
+
+acq_method_imputed = pd.concat([y_train_knn, y_val_knn], axis=0)
+
+X_val_final = impute_df(X_val)
+
+# Impute test acq_method
 

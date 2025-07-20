@@ -84,7 +84,7 @@ Looking into where lot sq footage is 0 (only one entry)
 3other               8942
 3autodwellingumb     1830
 
-
+NonAuto group only has 1dwelling and 3other types
 
 household_policy_counts - Total number of policies (auto, home, etc.) held within the policyholder's household.
 count    80000.000000
@@ -108,6 +108,7 @@ min        -20.000000
 75%          8.000000
 max         97.000000
 
+NonAuto group has only value -20
 
 Treating newest_veh_age as a Categorical Column: When the value is -20, it is labeled as "Non-Auto". 
 For other values, a label like "Age_8" is used (indicating age 8, for example). 
