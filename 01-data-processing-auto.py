@@ -100,6 +100,8 @@ def knn_prep(X):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
+    conn.close()
+
     return X_train, y_train, X_test, y_test
 
 
@@ -221,6 +223,8 @@ def knn_prep(X):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
+    conn.close()
+
     return X_train, y_train, X_test, y_test
 
 
@@ -335,6 +339,8 @@ def knn_prep(X):
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
+    conn.close()
+
     return X_train, y_train, X_test, y_test
 
 
@@ -397,3 +403,61 @@ y_test_knn["telematics_ind_encoded"] = y_pred
 telematics_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
 
 auto_test_df = impute_df(auto_test_df, telematics_ind_imputed)
+
+
+# ordinal_map = {
+#     'SPGrp1Miss': 0,
+#     'SPGrp1': 1,
+#     'SPGrp2': 2,
+#     'SPGrp3': 3,
+#     'SPGrp4': 4,
+#     'CSLGrp1': 5,
+#     'CSLGrp2': 6,
+#     'CSLGrp3': 7
+# }
+
+# For LightGBM or CatBoost model (no need to scale numerical variables or encode categorical variables)
+if not os.path.exists("data/model_data_auto"):
+    os.makedirs("data/model_data_auto")
+
+# Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical)
+nominal_col = ["acq_method_filled", "channel", "digital_contact_ind", "geo_group", "has_prior_carrier", "household_group", "pay_type_code", "pol_edeliv_ind_filled",
+               "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind_filled"]
+ordinal_col = ["bi_limit_group"]
+
+numeric_col = ["12m_call_history", "ann_prm_amt", "home_lot_sq_footage", "household_policy_counts", "newest_veh_age", "tenure_at_snapshot",
+               "trm_len_mo"]
+
+
+def label_encode_ordinal(X):
+    data = X.copy()
+    conn = duckdb.connect()
+    conn.register("data", data)
+    query = """
+    WITH cte AS (
+        SELECT 
+            *,
+        CASE WHEN bi_limit_group = 'SPGrp1Miss' THEN 0
+        WHEN bi_limit_group = 'SPGrp1' THEN 1
+        WHEN bi_limit_group = 'SPGrp2' THEN 2
+        WHEN bi_limit_group = 'SPGrp3' THEN 3
+        WHEN bi_limit_group = 'SPGrp4' THEN 4
+        WHEN bi_limit_group = 'CSLGrp1' THEN 5
+        WHEN bi_limit_group = 'CSLGrp2' THEN 6
+        WHEN bi_limit_group = 'CSLGrp3' THEN 7
+        ELSE NULL END AS bi_limit_group_encoded
+        FROM data
+    )
+    SELECT * FROM cte;
+    --SELECT * EXCLUDE (bi_limit_group)
+    --FROM cte;
+    """
+    df = conn.execute(query).fetch_df()
+    conn.close()
+    return df 
+
+
+X_train_encoded = label_encode_ordinal(X_train)
+
+
+
