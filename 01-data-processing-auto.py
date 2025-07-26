@@ -8,7 +8,7 @@ import os
 
 """
 Data Processing
-Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
+Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind) (Auto doesn't need trm_len_mo sinec it is always 6)
 Step 2: Split train into train and validation
 Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 as missing), telematics_ind (-1 as missing)
 - Training data: NonAuto Train, Auto Train
@@ -26,13 +26,16 @@ test = pd.read_csv("data/test_data.csv")
 
 random_state = 42
 
-# Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
+# Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind) (Auto doesn't need trm_len_mo sinec it is always 6)
 def auto(data):
     conn = duckdb.connect()
     conn.register("data", data)
     auto_query = """
+    WITH cte AS (
         SELECT * FROM data 
-        WHERE bi_limit_group != 'NonAuto' AND newest_veh_age != -20 AND telematics_ind != -2;
+        WHERE bi_limit_group != 'NonAuto' AND newest_veh_age != -20 AND telematics_ind != -2
+    )
+    SELECT * EXCLUDE (trm_len_mo) FROM cte;
     """
     df = conn.execute(auto_query).fetch_df()
     conn.close()
@@ -67,7 +70,6 @@ def knn_prep(X):
             household_policy_counts,
             newest_veh_age,
             tenure_at_snapshot,
-            trm_len_mo,
             CAST(CASE 
                 WHEN acq_method = 'method1' THEN 1
                 WHEN acq_method = 'method2' THEN 2
@@ -192,7 +194,6 @@ def knn_prep(X):
             household_policy_counts,
             newest_veh_age,
             tenure_at_snapshot,
-            trm_len_mo,
             CAST(CASE 
                 WHEN pol_edeliv_ind = 0 THEN 0
                 WHEN pol_edeliv_ind = 1 THEN 1
@@ -309,7 +310,6 @@ def knn_prep(X):
             household_policy_counts,
             newest_veh_age,
             tenure_at_snapshot,
-            trm_len_mo,
             CAST(CASE 
                 WHEN telematics_ind = 0 THEN 0
                 WHEN telematics_ind = 1 THEN 1
@@ -412,5 +412,6 @@ if not os.path.exists("data/model_data_auto"):
 X_train.to_csv("data/model_data_auto/X_train.csv", index=False)
 X_val.to_csv("data/model_data_auto/X_val.csv", index=False)
 auto_test_df.to_csv("data/model_data_auto/X_test.csv", index=False)
-
+y_train.to_csv("data/model_data_auto/y_train.csv", index=False)
+y_val.to_csv("data/model_data_auto/y_val.csv", index=False)
 
