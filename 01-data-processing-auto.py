@@ -8,9 +8,9 @@ import os
 
 """
 Data Processing
-Step 1: split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
-Step 2: split train into train and validation
-Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 and -1 as missing), telematics_ind (-1 as missing)
+Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind)
+Step 2: Split train into train and validation
+Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 as missing), telematics_ind (-1 as missing)
 - Training data: NonAuto Train, Auto Train
 - Validation data: NonAuto Val, Auto Val
 - Test: NonAuto Test, Auto Test
@@ -174,7 +174,7 @@ auto_test_df = impute_df(auto_test_df, acq_method_imputed)
 
 
 
-# Prepare data for imputing pol_edeliv_ind (-2 and -1 as missing) using KNN
+# Prepare data for imputing pol_edeliv_ind (-2 and missing) using KNN
 def knn_prep(X):
     data = X.copy()
     data["index"] = X.index
@@ -196,6 +196,7 @@ def knn_prep(X):
             CAST(CASE 
                 WHEN pol_edeliv_ind = 0 THEN 0
                 WHEN pol_edeliv_ind = 1 THEN 1
+                WHEN pol_edeliv_ind = -1 THEN -1
                 ELSE NULL 
             END AS INTEGER) AS pol_edeliv_ind_encoded
         FROM data;
@@ -240,7 +241,7 @@ def impute_df(X, pol_edeliv_ind_imputed):
     WITH cte AS (SELECT 
         a.*,
         CASE 
-            WHEN a.pol_edeliv_ind IN (-1, -2) THEN b.pol_edeliv_ind_encoded
+            WHEN a.pol_edeliv_ind = -2 THEN b.pol_edeliv_ind_encoded
             ELSE a.pol_edeliv_ind
         END AS pol_edeliv_ind_filled
     FROM data AS a
@@ -405,59 +406,11 @@ telematics_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
 auto_test_df = impute_df(auto_test_df, telematics_ind_imputed)
 
 
-# ordinal_map = {
-#     'SPGrp1Miss': 0,
-#     'SPGrp1': 1,
-#     'SPGrp2': 2,
-#     'SPGrp3': 3,
-#     'SPGrp4': 4,
-#     'CSLGrp1': 5,
-#     'CSLGrp2': 6,
-#     'CSLGrp3': 7
-# }
 
-# For LightGBM or CatBoost model (no need to scale numerical variables or encode categorical variables)
 if not os.path.exists("data/model_data_auto"):
     os.makedirs("data/model_data_auto")
-
-# Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical)
-nominal_col = ["acq_method_filled", "channel", "digital_contact_ind", "geo_group", "has_prior_carrier", "household_group", "pay_type_code", "pol_edeliv_ind_filled",
-               "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind_filled"]
-ordinal_col = ["bi_limit_group"]
-
-numeric_col = ["12m_call_history", "ann_prm_amt", "home_lot_sq_footage", "household_policy_counts", "newest_veh_age", "tenure_at_snapshot",
-               "trm_len_mo"]
-
-
-def label_encode_ordinal(X):
-    data = X.copy()
-    conn = duckdb.connect()
-    conn.register("data", data)
-    query = """
-    WITH cte AS (
-        SELECT 
-            *,
-        CASE WHEN bi_limit_group = 'SPGrp1Miss' THEN 0
-        WHEN bi_limit_group = 'SPGrp1' THEN 1
-        WHEN bi_limit_group = 'SPGrp2' THEN 2
-        WHEN bi_limit_group = 'SPGrp3' THEN 3
-        WHEN bi_limit_group = 'SPGrp4' THEN 4
-        WHEN bi_limit_group = 'CSLGrp1' THEN 5
-        WHEN bi_limit_group = 'CSLGrp2' THEN 6
-        WHEN bi_limit_group = 'CSLGrp3' THEN 7
-        ELSE NULL END AS bi_limit_group_encoded
-        FROM data
-    )
-    SELECT * FROM cte;
-    --SELECT * EXCLUDE (bi_limit_group)
-    --FROM cte;
-    """
-    df = conn.execute(query).fetch_df()
-    conn.close()
-    return df 
-
-
-X_train_encoded = label_encode_ordinal(X_train)
-
+X_train.to_csv("data/model_data_auto/X_train.csv", index=False)
+X_val.to_csv("data/model_data_auto/X_val.csv", index=False)
+auto_test_df.to_csv("data/model_data_auto/X_test.csv", index=False)
 
 
