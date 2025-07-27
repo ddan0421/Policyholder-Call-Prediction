@@ -18,10 +18,10 @@ def non_auto(data):
     nonauto_query = """
         WITH cte AS (
             SELECT * FROM data 
-            WHERE bi_limit_group = 'NonAuto' AND newest_veh_age = -20 AND telematics_ind = -2
+            WHERE bi_limit_group = 'NonAuto' AND telematics_ind = -2
         )
-        SELECT * EXCLUDE (bi_limit_group, newest_veh_age, telematics_ind)
-        FROM cte;
+       SELECT * EXCLUDE (bi_limit_group, newest_veh_age, telematics_ind)
+       FROM cte;
     """
     df = conn.execute(nonauto_query).fetch_df()
     conn.close()
@@ -37,7 +37,7 @@ y = nonauto_train_df["call_counts"]
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=random_state)
 
 
-# Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 and -1 as missing), telematics_ind (-1 as missing)
+# Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 as missing)
 
 # Prepare data for imputing acq_method using KNN
 def knn_prep(X):

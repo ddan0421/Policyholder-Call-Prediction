@@ -18,9 +18,9 @@ def auto(data):
     auto_query = """
     WITH cte AS (
         SELECT * FROM data 
-        WHERE bi_limit_group != 'NonAuto' AND newest_veh_age != -20 AND telematics_ind != -2
+        WHERE bi_limit_group != 'NonAuto' AND telematics_ind != -2
     )
-    SELECT * EXCLUDE (trm_len_mo) FROM cte;
+    SELECT * EXCLUDE (trm_len_mo, channel) FROM cte;
     """
     df = conn.execute(auto_query).fetch_df()
     conn.close()
@@ -35,7 +35,7 @@ y = auto_train_df["call_counts"]
 
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=random_state)
 
-# Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 and -1 as missing), telematics_ind (-1 as missing)
+# Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 as missing)
 
 # Prepare data for imputing acq_method using KNN
 def knn_prep(X):
@@ -274,121 +274,6 @@ y_test_knn["pol_edeliv_ind_encoded"] = y_pred
 pol_edeliv_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
 
 auto_test_df = impute_df(auto_test_df, pol_edeliv_ind_imputed)
-
-
-
-# Prepare data for imputing telematics_ind (-1 as missing) using KNN
-def knn_prep(X):
-    data = X.copy()
-    data["index"] = X.index
-
-    conn = duckdb.connect()
-    conn.register("data", data)
-    
-    query = """
-    CREATE OR REPLACE TABLE knn_prep AS
-        SELECT 
-            index, -- keeping track of index
-            "12m_call_history",
-            ann_prm_amt,
-            home_lot_sq_footage,
-            household_policy_counts,
-            newest_veh_age,
-            tenure_at_snapshot,
-            CAST(CASE 
-                WHEN telematics_ind = 0 THEN 0
-                WHEN telematics_ind = 1 THEN 1
-                ELSE NULL 
-            END AS INTEGER) AS telematics_ind_encoded
-        FROM data;
-    """
-    conn.execute(query)
-    train = """
-        SELECT * FROM knn_prep
-        WHERE telematics_ind_encoded IS NOT NULL;
-    """
-    test = """
-        SELECT * FROM knn_prep
-        WHERE telematics_ind_encoded IS NULL;
-    """
-
-    train = conn.execute(train).fetch_df()
-    test = conn.execute(test).fetch_df()
-
-    X_train = train.drop(["telematics_ind_encoded", "index"], axis=1)
-    y_train = train[["index","telematics_ind_encoded"]] # has values for the target
-
-    X_test = test.drop(["telematics_ind_encoded", "index"], axis=1)
-    y_test = test[["index","telematics_ind_encoded"]] # need to be imputed
-
-    scaler = MinMaxScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    conn.close()
-
-    return X_train, y_train, X_test, y_test
-
-
-def impute_df(X, telematics_ind_imputed):
-    data = X.copy()
-    data["index"] = data.index
-
-    conn = duckdb.connect()
-    conn.register("data", data)
-    conn.register("telematics_ind_imputed", telematics_ind_imputed)
-
-    query = """
-    WITH cte AS (SELECT 
-        a.*,
-        CASE 
-            WHEN a.telematics_ind = -1 THEN b.telematics_ind_encoded
-            ELSE a.telematics_ind
-        END AS telematics_ind_filled
-    FROM data AS a
-    LEFT JOIN telematics_ind_imputed AS b
-    ON a.index = b.index)
-
-    SELECT * EXCLUDE (telematics_ind)
-    FROM cte;
-    """
-    X_final = conn.execute(query).fetch_df()
-    X_final.set_index("index", inplace=True)
-    conn.close()
-    return X_final
-
-
-
-# Impute X_train telematics_ind
-X_train_knn, y_train_knn, X_test_knn, y_test_knn = knn_prep(X_train)
-
-# Train KNNClassifier imputer
-knn_imputer = KNeighborsClassifier(n_neighbors=5)  # you can tune this
-knn_imputer.fit(X_train_knn, y_train_knn["telematics_ind_encoded"].values)
-
-y_pred = knn_imputer.predict(X_test_knn)
-y_test_knn["telematics_ind_encoded"] = y_pred
-telematics_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
-
-X_train = impute_df(X_train, telematics_ind_imputed)
-
-
-
-# Impute X_val telematics_ind
-_, y_train_knn, X_test_knn, y_test_knn = knn_prep(X_val)
-y_pred = knn_imputer.predict(X_test_knn)
-y_test_knn["telematics_ind_encoded"] = y_pred
-telematics_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
-
-X_val = impute_df(X_val, telematics_ind_imputed)
-
-# Impute test telematics_ind
-_, y_train_knn, X_test_knn, y_test_knn = knn_prep(auto_test_df)
-y_pred = knn_imputer.predict(X_test_knn)
-y_test_knn["telematics_ind_encoded"] = y_pred
-telematics_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
-
-auto_test_df = impute_df(auto_test_df, telematics_ind_imputed)
 
 
 
