@@ -11,7 +11,7 @@ test = pd.read_csv("data/test_data.csv")
 
 random_state = 42
 
-# Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind) (Auto doesn't need trm_len_mo sinec it is always 6)
+# Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind) (Auto doesn't need trm_len_mo sinec it is always 6 and doesn't need channel since it is always retail)
 def auto(data):
     conn = duckdb.connect()
     conn.register("data", data)
