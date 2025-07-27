@@ -4,7 +4,7 @@ output: html_document
 date: "2025-07-19"
 ---
 ```{r}
-library(tidyverse, rlang, corrplot)
+library("tidyverse", "rlang", "corrplot")
 ```
 
 ```{r}
@@ -21,33 +21,89 @@ testing %>%
 testing %>% 
   select(pol_edeliv_ind, pol_edeliv_ind_filled) %>% 
   filter(pol_edeliv_ind == -2)
-
-testing %>% 
-  select(telematics_ind, telematics_ind_filled) %>% 
-  filter(telematics_ind == -1)
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Call Count Analysis
+```{r}
+train <- read.csv("data/train_data.csv")
+```
+
+
+```{r}
+summary(train$call_counts)
+mean(train$call_counts)
+var(train$call_counts)
+
+sum(train$call_counts == 0) / length(train$call_counts)
+
+```
+
+```{r}
+train %>%
+  ggplot(aes(x=call_counts)) +
+  geom_histogram(bins = 30, fill = "blue", color = "white") +
+  labs(title = "Histogram of Call Counts",
+       x = "Number of Calls",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+Overdispersion exists in call_counts, which violates Poisson Distribution's assumption of mean and variance are both similar to lambda
+
+Use Hurdle method to model call_counts:
+https://stats.stackexchange.com/questions/81457/what-is-the-difference-between-zero-inflated-and-hurdle-models
+
+
+Hurdle models assume that there is only one process by which a zero can be produced, while zero-inflated models assume that there are 2 different processes that can produce a zero.
+
+Hurdle models assume 2 types of subjects: (1) those who never experience the outcome and (2) those who always experience the outcome at least once. Zero-inflated models conceptualize subjects as (1) those who never experience the outcome and (2) those who can experience the outcome but don't always.
+
+In simple terms: both zero-inflated and hurdle models are described in two parts.
+
+The first is the on-off part, which is a binary process. The system is "off" with probability π
+ and "on" with probability 1−π
+. (Here, π
+ is known as the inflation probability.) When the system is "off," only zero counts are possible. This part is the same for zero-inflated and hurdle models.
+
+The second part is the counting part, which occurs when the system is "on." This is where zero-inflated and hurdle models differ. In zero-inflated models, counts can still be zero. In hurdle models they must be nonzero. For this part, zero-inflated models use a "usual" discrete probability distribution while hurdle models use a zero-truncated discrete probability distribution function.
 
 Check step1 data
 
 ```{r}
-# X_train <- read.csv("data/model_data_auto/X_train.csv")
-# X_val <- read.csv("data/model_data_auto/X_val.csv")
-# X_test <- read.csv("data/model_data_auto/X_test.csv")
+X_train <- read.csv("data/model_data_auto/X_train.csv")
+X_val <- read.csv("data/model_data_auto/X_val.csv")
+X_test <- read.csv("data/model_data_auto/X_test.csv")
+
+y_train <- read.csv("data/model_data_auto/y_train.csv")
+y_val <- read.csv("data/model_data_auto/y_val.csv")
+
+# X_train <- read.csv("data/model_data_Nonauto/X_train.csv")
+# X_val <- read.csv("data/model_data_Nonauto/X_val.csv")
+# X_test <- read.csv("data/model_data_Nonauto/X_test.csv")
 # 
-# y_train <- read.csv("data/model_data_auto/y_train.csv")
-# y_val <- read.csv("data/model_data_auto/y_val.csv")
-
-X_train <- read.csv("data/model_data_Nonauto/X_train.csv")
-X_val <- read.csv("data/model_data_Nonauto/X_val.csv")
-X_test <- read.csv("data/model_data_Nonauto/X_test.csv")
-
-y_train <- read.csv("data/model_data_Nonauto/y_train.csv")
-y_val <- read.csv("data/model_data_Nonauto/y_val.csv")
-
-
+# y_train <- read.csv("data/model_data_Nonauto/y_train.csv")
+# y_val <- read.csv("data/model_data_Nonauto/y_val.csv")
 
 train <- cbind(X_train, y_train)
 val <- cbind(X_val, y_val)
+
+mean(train$call_counts)
+var(train$call_counts)
 ```
 
 Univariate Analysis
@@ -89,10 +145,10 @@ histogram_summary <- function(data, num_var, bins = 30) {
 ```{r}
 histogram_summary(train, "ann_prm_amt")
 histogram_summary(train, "call_counts")
-# histogram_summary(train, "newest_veh_age") # only in auto
+histogram_summary(train, "newest_veh_age") # only in auto
 histogram_summary(train, "X12m_call_history")
 histogram_summary(train, "tenure_at_snapshot")
-histogram_summary(train, "trm_len_mo") # only in nonauto
+# histogram_summary(train, "trm_len_mo") # only in nonauto
 histogram_summary(train, "home_lot_sq_footage")
 histogram_summary(train, "household_policy_counts")
 ```
@@ -136,8 +192,8 @@ categorical_summary <- function(data, cat_var) {
 
 ```{r}
 categorical_summary(train, "acq_method_filled")
-# categorical_summary(train, "bi_limit_group") # only in auto
-categorical_summary(train, "channel") # only in non auto
+categorical_summary(train, "bi_limit_group") # only in auto
+# categorical_summary(train, "channel") # only in non auto
 categorical_summary(train, "digital_contact_ind")
 categorical_summary(train, "geo_group")
 categorical_summary(train, "has_prior_carrier")
@@ -146,7 +202,7 @@ categorical_summary(train, "pay_type_code")
 categorical_summary(train, "pol_edeliv_ind_filled")
 categorical_summary(train, "prdct_sbtyp_grp")
 categorical_summary(train, "product_sbtyp")
-# categorical_summary(train, "telematics_ind_filled") # only in auto
+categorical_summary(train, "telematics_ind") # only in auto
 ```
 
 
@@ -199,7 +255,6 @@ boxplot_summary(train, "bi_limit_group", "call_counts")
 boxplot_summary(train, "bi_limit_group", "newest_veh_age")
 boxplot_summary(train, "bi_limit_group", "X12m_call_history")
 boxplot_summary(train, "bi_limit_group", "tenure_at_snapshot")
-# boxplot_summary(train, "bi_limit_group", "trm_len_mo")
 boxplot_summary(train, "bi_limit_group", "home_lot_sq_footage")
 boxplot_summary(train, "bi_limit_group", "household_policy_counts")
 
