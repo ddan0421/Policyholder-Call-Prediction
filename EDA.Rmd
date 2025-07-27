@@ -1,0 +1,246 @@
+---
+title: "Untitled"
+output: html_document
+date: "2025-07-19"
+---
+```{r}
+library(tidyverse, rlang, corrplot)
+```
+
+```{r}
+testing <- read.csv("testing.csv")
+```
+
+
+Testing Imputation Quality
+```{r}
+testing %>% 
+  select(acq_method, acq_method_filled) %>% 
+  filter(acq_method == 'missing')
+
+testing %>% 
+  select(pol_edeliv_ind, pol_edeliv_ind_filled) %>% 
+  filter(pol_edeliv_ind == -2)
+
+testing %>% 
+  select(telematics_ind, telematics_ind_filled) %>% 
+  filter(telematics_ind == -1)
+```
+
+Check step1 data
+
+```{r}
+# X_train <- read.csv("data/model_data_auto/X_train.csv")
+# X_val <- read.csv("data/model_data_auto/X_val.csv")
+# X_test <- read.csv("data/model_data_auto/X_test.csv")
+# 
+# y_train <- read.csv("data/model_data_auto/y_train.csv")
+# y_val <- read.csv("data/model_data_auto/y_val.csv")
+
+X_train <- read.csv("data/model_data_Nonauto/X_train.csv")
+X_val <- read.csv("data/model_data_Nonauto/X_val.csv")
+X_test <- read.csv("data/model_data_Nonauto/X_test.csv")
+
+y_train <- read.csv("data/model_data_Nonauto/y_train.csv")
+y_val <- read.csv("data/model_data_Nonauto/y_val.csv")
+
+
+
+train <- cbind(X_train, y_train)
+val <- cbind(X_val, y_val)
+```
+
+Univariate Analysis
+
+Numerical analysis using histogram
+```{r}
+histogram_summary <- function(data, num_var, bins = 30) {
+  # Convert the variable name from string to symbol
+  num_sym <- sym(num_var)
+
+  # Histogram
+  p <- data %>%
+    ggplot(aes(x = !!num_sym)) +
+    geom_histogram(bins = bins, fill = "steelblue", color = "black") +
+    labs(
+      title = paste("Histogram of", num_var),
+      x = num_var,
+      y = "Count"
+    ) +
+    theme_minimal()
+
+  print(p)
+
+  # Summary statistics
+  summary_table <- data %>%
+    summarize(
+      mean = mean(!!num_sym, na.rm = TRUE),
+      median = median(!!num_sym, na.rm = TRUE),
+      sd = sd(!!num_sym, na.rm = TRUE),
+      min = min(!!num_sym, na.rm = TRUE),
+      max = max(!!num_sym, na.rm = TRUE),
+      n = sum(!is.na(!!num_sym))
+    )
+
+  return(summary_table)
+}
+```
+
+```{r}
+histogram_summary(train, "ann_prm_amt")
+histogram_summary(train, "call_counts")
+# histogram_summary(train, "newest_veh_age") # only in auto
+histogram_summary(train, "X12m_call_history")
+histogram_summary(train, "tenure_at_snapshot")
+histogram_summary(train, "trm_len_mo") # only in nonauto
+histogram_summary(train, "home_lot_sq_footage")
+histogram_summary(train, "household_policy_counts")
+```
+
+Nominal categorical analysis using boxplot
+
+```{r}
+categorical_summary <- function(data, cat_var) {
+  # Convert variable name from string to symbol
+  cat_sym <- sym(cat_var)
+
+  # Bar plot
+  p <- data %>%
+    ggplot(aes(x = !!cat_sym)) +
+    geom_bar(fill = "steelblue", color = "black") +
+    labs(
+      title = paste("Bar Plot of", cat_var),
+      x = cat_var,
+      y = "Count"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  print(p)
+
+  # Frequency table with proportions
+  summary_table <- data %>%
+    group_by(!!cat_sym) %>%
+    summarize(
+      count = n(),
+      proportion = count / sum(count),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(count))
+
+  return(summary_table)
+}
+
+```
+
+
+```{r}
+categorical_summary(train, "acq_method_filled")
+# categorical_summary(train, "bi_limit_group") # only in auto
+categorical_summary(train, "channel") # only in non auto
+categorical_summary(train, "digital_contact_ind")
+categorical_summary(train, "geo_group")
+categorical_summary(train, "has_prior_carrier")
+categorical_summary(train, "household_group")
+categorical_summary(train, "pay_type_code")
+categorical_summary(train, "pol_edeliv_ind_filled")
+categorical_summary(train, "prdct_sbtyp_grp")
+categorical_summary(train, "product_sbtyp")
+# categorical_summary(train, "telematics_ind_filled") # only in auto
+```
+
+
+
+
+Bivariate Analysis
+```{r}
+
+boxplot_summary <- function(data, cat_var, num_var) {
+  # Convert column names from strings to symbols
+  cat_sym <- sym(cat_var)
+  num_sym <- sym(num_var)
+
+  # Boxplot
+  p <- data %>%
+    ggplot(aes(x = !!cat_sym, y = !!num_sym)) +
+    geom_boxplot(fill = "skyblue", color = "darkblue", outlier.shape = 1, outlier.colour = "red") +
+    labs(
+      title = paste(num_var, "by", cat_var),
+      x = cat_var,
+      y = num_var
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+  print(p)
+
+  # Summary table
+  summary_table <- data %>%
+    group_by(!!cat_sym) %>%
+    summarize(
+      mean_value = mean(!!num_sym, na.rm = TRUE),
+      median_value = median(!!num_sym, na.rm = TRUE),
+      n = n(),
+      .groups = "drop"
+    ) %>%
+    arrange(median_value)
+
+  return(summary_table)
+}
+
+```
+
+
+
+```{r}
+# Is bi_limit_group truly nominal categorical?
+boxplot_summary(train, "bi_limit_group", "ann_prm_amt")
+boxplot_summary(train, "bi_limit_group", "call_counts")
+boxplot_summary(train, "bi_limit_group", "newest_veh_age")
+boxplot_summary(train, "bi_limit_group", "X12m_call_history")
+boxplot_summary(train, "bi_limit_group", "tenure_at_snapshot")
+# boxplot_summary(train, "bi_limit_group", "trm_len_mo")
+boxplot_summary(train, "bi_limit_group", "home_lot_sq_footage")
+boxplot_summary(train, "bi_limit_group", "household_policy_counts")
+
+```
+
+
+Correlation Matrix
+```{r}
+correlation_matrix <- function(data, num_vars) {
+
+  # Select specified numeric columns
+  selected_data <- data %>% select(num_vars)
+  
+  # Compute correlation matrix
+  cor_matrix <- cor(selected_data, use = "pairwise.complete.obs")
+  
+  # Plot heatmap using corrplot
+  corrplot::corrplot(cor_matrix,
+                     method = "color",
+                     type = "lower",
+                     tl.col = "black",
+                     addCoef.col = "black",  # Add correlation coefficients
+                     number.cex = 0.7,
+                     col = colorRampPalette(c("blue", "white", "orange"))(200),
+                     title = "Correlation Matrix Heatmap",
+                     mar = c(0, 0, 2, 0))  # Top margin space for title
+
+  # Return correlation matrix
+  return(cor_matrix)
+}
+
+
+```
+
+```{r}
+library("corrplot")
+correlation_matrix(train, c("call_counts", "ann_prm_amt", "newest_veh_age", "X12m_call_history", "tenure_at_snapshot", "home_lot_sq_footage", "household_policy_counts"))
+```
+
+```{r}
+library("corrplot")
+correlation_matrix(train, c("call_counts", "ann_prm_amt",  "X12m_call_history", "tenure_at_snapshot", "home_lot_sq_footage", "household_policy_counts"))
+```
+
