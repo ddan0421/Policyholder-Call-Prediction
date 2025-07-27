@@ -6,21 +6,6 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import KNeighborsClassifier
 import os
 
-"""
-Data Processing
-Step 1: Split data into NonAuto and Auto (NonAuto doesn't need bi_limit_group, newest_veh_age, telematics_ind) (Auto doesn't need trm_len_mo sinec it is always 6)
-Step 2: Split train into train and validation
-Step 3: Use KNN to impute missing categorical values for these categorical variables: acq_method (missing), pol_edeliv_ind (-2 as missing), telematics_ind (-1 as missing)
-- Training data: NonAuto Train, Auto Train
-- Validation data: NonAuto Val, Auto Val
-- Test: NonAuto Test, Auto Test
-** Use NonAuto Train to train KNN to impute NonAuto Train, NonAuto Val, and NonAuto Test
-** Use Auto Train to train KNN to impute Auto Train, Auto Val, and Auto Test
-Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical)
-** Remember to reindex the validation and test sets to match the one-hot encoded columns of the training set. X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-Step 5: Scale Numerical (normalization or standardization) for train and use the same mean and st dev for validation and test sets
-
-"""
 train = pd.read_csv("data/train_data.csv")
 test = pd.read_csv("data/test_data.csv")
 
@@ -407,8 +392,7 @@ auto_test_df = impute_df(auto_test_df, telematics_ind_imputed)
 
 
 
-if not os.path.exists("data/model_data_auto"):
-    os.makedirs("data/model_data_auto")
+os.makedirs("data/model_data_auto", exist_ok=True)
 X_train.to_csv("data/model_data_auto/X_train.csv", index=False)
 X_val.to_csv("data/model_data_auto/X_val.csv", index=False)
 auto_test_df.to_csv("data/model_data_auto/X_test.csv", index=False)
