@@ -82,6 +82,43 @@ The first is the on-off part, which is a binary process. The system is "off" wit
 
 The second part is the counting part, which occurs when the system is "on." This is where zero-inflated and hurdle models differ. In zero-inflated models, counts can still be zero. In hurdle models they must be nonzero. For this part, zero-inflated models use a "usual" discrete probability distribution while hurdle models use a zero-truncated discrete probability distribution function.
 
+
+```{r}
+# Check distribution for non-zero data
+
+count_data <- train$call_counts[train$call_counts != 0]
+
+summary(count_data)
+mean(count_data)
+var(count_data)
+
+
+train %>%
+  filter(train$call_counts != 0) %>% 
+  ggplot(aes(x=count_data)) +
+  geom_histogram(bins = 30, fill = "blue", color = "white") +
+  labs(title = "Histogram of Call Counts",
+       x = "Number of Calls",
+       y = "Frequency") +
+  theme_minimal()
+```
+Summary Finding:
+- Try Zero-Inflated NegBin (handles overdispersion, excess zeros)
+- Try Hurdle Model (first classification on (zero or nonzero) data then regression on count data)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Check step1 data
 
 ```{r}
@@ -145,10 +182,10 @@ histogram_summary <- function(data, num_var, bins = 30) {
 ```{r}
 histogram_summary(train, "ann_prm_amt")
 histogram_summary(train, "call_counts")
-histogram_summary(train, "newest_veh_age") # only in auto
+# histogram_summary(train, "newest_veh_age") # only in auto
 histogram_summary(train, "X12m_call_history")
 histogram_summary(train, "tenure_at_snapshot")
-# histogram_summary(train, "trm_len_mo") # only in nonauto
+histogram_summary(train, "trm_len_mo") # only in nonauto
 histogram_summary(train, "home_lot_sq_footage")
 histogram_summary(train, "household_policy_counts")
 ```
@@ -174,12 +211,14 @@ categorical_summary <- function(data, cat_var) {
 
   print(p)
 
+  total_n <- nrow(data)
+  
   # Frequency table with proportions
   summary_table <- data %>%
     group_by(!!cat_sym) %>%
     summarize(
       count = n(),
-      proportion = count / sum(count),
+      proportion = count / total_n,
       .groups = "drop"
     ) %>%
     arrange(desc(count))
@@ -192,8 +231,8 @@ categorical_summary <- function(data, cat_var) {
 
 ```{r}
 categorical_summary(train, "acq_method_filled")
-categorical_summary(train, "bi_limit_group") # only in auto
-# categorical_summary(train, "channel") # only in non auto
+# categorical_summary(train, "bi_limit_group") # only in auto
+categorical_summary(train, "channel") # only in non auto
 categorical_summary(train, "digital_contact_ind")
 categorical_summary(train, "geo_group")
 categorical_summary(train, "has_prior_carrier")
@@ -202,7 +241,7 @@ categorical_summary(train, "pay_type_code")
 categorical_summary(train, "pol_edeliv_ind_filled")
 categorical_summary(train, "prdct_sbtyp_grp")
 categorical_summary(train, "product_sbtyp")
-categorical_summary(train, "telematics_ind") # only in auto
+# categorical_summary(train, "telematics_ind") # only in auto
 ```
 
 
@@ -260,6 +299,20 @@ boxplot_summary(train, "bi_limit_group", "household_policy_counts")
 
 ```
 
+```{r}
+# Is prdct_sbtyp_grp truly nominal categorical?
+boxplot_summary(train, "prdct_sbtyp_grp", "ann_prm_amt")
+boxplot_summary(train, "prdct_sbtyp_grp", "call_counts")
+boxplot_summary(train, "prdct_sbtyp_grp", "newest_veh_age")
+boxplot_summary(train, "prdct_sbtyp_grp", "X12m_call_history")
+boxplot_summary(train, "prdct_sbtyp_grp", "tenure_at_snapshot")
+boxplot_summary(train, "prdct_sbtyp_grp", "home_lot_sq_footage")
+boxplot_summary(train, "prdct_sbtyp_grp", "household_policy_counts")
+```
+
+
+
+
 
 Correlation Matrix
 ```{r}
@@ -290,11 +343,13 @@ correlation_matrix <- function(data, num_vars) {
 ```
 
 ```{r}
+# Auto
 library("corrplot")
 correlation_matrix(train, c("call_counts", "ann_prm_amt", "newest_veh_age", "X12m_call_history", "tenure_at_snapshot", "home_lot_sq_footage", "household_policy_counts"))
 ```
 
 ```{r}
+# Non Auto
 library("corrplot")
 correlation_matrix(train, c("call_counts", "ann_prm_amt",  "X12m_call_history", "tenure_at_snapshot", "home_lot_sq_footage", "household_policy_counts"))
 ```
