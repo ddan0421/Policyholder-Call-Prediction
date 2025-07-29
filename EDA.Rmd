@@ -148,11 +148,15 @@ Univariate Analysis
 Numerical analysis using histogram
 ```{r}
 histogram_summary <- function(data, num_var, bins = 30) {
+  library(ggplot2)
+  library(dplyr)
+  library(rlang)
+
   # Convert the variable name from string to symbol
   num_sym <- sym(num_var)
 
   # Histogram
-  p <- data %>%
+  p_hist <- data %>%
     ggplot(aes(x = !!num_sym)) +
     geom_histogram(bins = bins, fill = "steelblue", color = "black") +
     labs(
@@ -162,7 +166,21 @@ histogram_summary <- function(data, num_var, bins = 30) {
     ) +
     theme_minimal()
 
-  print(p)
+  print(p_hist)
+
+  # QQ Plot
+  p_qq <- data %>%
+    ggplot(aes(sample = !!num_sym)) +
+    stat_qq(color = "darkred") +
+    stat_qq_line(color = "black") +
+    labs(
+      title = paste("QQ Plot of", num_var),
+      x = "Theoretical Quantiles",
+      y = "Sample Quantiles"
+    ) +
+    theme_minimal()
+
+  print(p_qq)
 
   # Summary statistics
   summary_table <- data %>%
@@ -177,18 +195,56 @@ histogram_summary <- function(data, num_var, bins = 30) {
 
   return(summary_table)
 }
+
 ```
 
 ```{r}
 histogram_summary(train, "ann_prm_amt")
 histogram_summary(train, "call_counts")
-# histogram_summary(train, "newest_veh_age") # only in auto
+histogram_summary(train, "newest_veh_age") # only in auto
 histogram_summary(train, "X12m_call_history")
 histogram_summary(train, "tenure_at_snapshot")
-histogram_summary(train, "trm_len_mo") # only in nonauto
+# histogram_summary(train, "trm_len_mo") # only in nonauto
 histogram_summary(train, "home_lot_sq_footage")
 histogram_summary(train, "household_policy_counts")
+histogram_summary(train %>% filter(call_counts != 0), "call_counts")
+
 ```
+
+
+```{r}
+# Tranforming Numerical Variables
+train$ann_prm_amt <- log1p(train$ann_prm_amt)
+histogram_summary(train, "ann_prm_amt")
+
+train_nonzero_call <- train %>% filter(call_counts != 0)
+train_nonzero_call$call_counts <- (train_nonzero_call$call_counts)^(1/3)
+histogram_summary(train_nonzero_call, "call_counts")
+
+train$call_counts <- log1p(train$call_counts)
+histogram_summary(train, "call_counts")
+
+
+train$newest_veh_age <- log1p(train$newest_veh_age)
+histogram_summary(train, "newest_veh_age") # only in auto
+
+train$X12m_call_history <- sqrt(train$X12m_call_history)
+histogram_summary(train, "X12m_call_history")
+
+train$tenure_at_snapshot <- (train$tenure_at_snapshot)^(1/3)
+histogram_summary(train, "tenure_at_snapshot")
+
+# train$trm_len_mo <- log1p(train$trm_len_mo)
+# histogram_summary(train, "trm_len_mo") # only in nonauto
+
+train$home_lot_sq_footage <- sqrt(train$home_lot_sq_footage)
+histogram_summary(train, "home_lot_sq_footage")
+
+train$household_policy_counts <- log1p(train$household_policy_counts)
+histogram_summary(train, "household_policy_counts")
+```
+
+
 
 Nominal categorical analysis using boxplot
 
