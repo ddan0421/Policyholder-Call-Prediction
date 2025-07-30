@@ -10,8 +10,9 @@ import lightgbm as lgb
 from sklearn.model_selection import GridSearchCV, KFold
 from sklearn.metrics import root_mean_squared_error
 import statsmodels.api as sm
+import catboost as cb
 """
-Two simple models to explore 
+Two simple models to explore for Auto dataset:
 - Simple OLS regression model
 - Ridge and Lasso Regression models 
 - Decision Tree Regressor
@@ -82,7 +83,7 @@ X_test_encoded[numerical_variables] = scaler.transform(X_test_encoded[numerical_
 
 
 X_train = sm.add_constant(X_train_encoded)
-X_val = sm.add_constant(X_val_encoded)
+X_val_ols = sm.add_constant(X_val_encoded)
 X_test = sm.add_constant(X_test_encoded)
 
 ols_model = models.sm_ols(X_train, y_train)
@@ -93,25 +94,6 @@ print(glm_lr_model.summary())
 
 con_ols_model = models.constrained_sm_glm_gaussian(X_train, y_train, glm_lr_model, 0.05)
 print(con_ols_model.summary())
-
-
-# Evaluation
-y_pred = ols_model.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for OLS: {rmse}")
-
-y_pred = glm_lr_model.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for GLM (Gaussian): {rmse}")
-
-y_pred = con_ols_model.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for Constrained GLM (Gaussian): {rmse}")
-
-"""
-Summary:
-using Gaussian for count data (call_counts) is not ideal
-"""
 
 
 ############################################## Regularized Regression Model ######################################################
@@ -174,7 +156,7 @@ X_test_encoded[numerical_variables] = scaler.transform(X_test_encoded[numerical_
 
 
 X_train = X_train_encoded.copy()
-X_val = X_val_encoded.copy()
+X_val_reg = X_val_encoded.copy()
 X_test = X_test_encoded.copy()
 
 ############################# Ridge Regression #############################
@@ -230,22 +212,6 @@ print(selected_features_lasso)
 
 
 
-# Evaluation
-y_pred = final_model_ridge.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for Ridge: {rmse}")
-
-y_pred = final_model_lasso.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for LASSO: {rmse}")
-
-"""
-Summary:
-Regularized regression models still use assume Gaussian distribution for the target variable
-using Gaussian for count data (call_counts) is not ideal
-"""
-
-
 ############################################## Decision Tree Regressor Model ############################################################
 X_train = pd.read_csv("data/model_data_auto/X_train.csv")
 X_val = pd.read_csv("data/model_data_auto/X_val.csv")
@@ -284,7 +250,7 @@ X_test_encoded[bool_columns_test] = X_test_encoded[bool_columns_test].astype("in
 
 
 X_train = X_train_encoded.copy()
-X_val = X_val_encoded.copy()
+X_val_tree = X_val_encoded.copy()
 X_test = X_test_encoded.copy()
 
 
@@ -317,12 +283,6 @@ selected_features_dt = X_train.columns[np.array(final_model_dt.feature_importanc
 print("Selected features for Decision Tree:")
 print(selected_features_dt)
 
-# Evaluation
-y_pred = final_model_dt.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for Decision Tree: {rmse}")
-
-
 
 ############################################## Random Forest Tree Regressor Model ############################################################
 cv = KFold(n_splits=10, shuffle=True, random_state=random_state)
@@ -354,13 +314,6 @@ final_model_rf = gs_rf.best_estimator_
 selected_features_rf = X_train.columns[np.array(final_model_rf.feature_importances_) > 0]
 print("Selected features for Random Forest:")
 print(selected_features_rf)
-
-# Evaluation
-y_pred = final_model_rf.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for Random Forest: {rmse}")
-
-
 
 ############################################## XGBoost Regressor Model ############################################################
 cv = KFold(n_splits=10, shuffle=True, random_state=random_state)
@@ -397,15 +350,93 @@ selected_features_xgb_final = X_train.columns[np.array(final_model_xgb.feature_i
 print("Selected features for XGBoost:")
 print(selected_features_xgb_final)
 
-# Evaluation
-y_pred = final_model_xgb.predict(X_val)
-rmse = root_mean_squared_error(y_val, y_pred)
-print(f"RMSE on validation set for XGBoost: {rmse}")
-
 ############################################## LightGBM Regressor Model ############################################################
+X_train = pd.read_csv("data/model_data_auto/X_train.csv")
+X_val_cat = pd.read_csv("data/model_data_auto/X_val.csv")
+y_train = pd.read_csv("data/model_data_auto/y_train.csv").squeeze()
+y_val = pd.read_csv("data/model_data_auto/y_val.csv").squeeze()
+X_test = pd.read_csv("data/model_data_auto/X_test.csv")
+
+cat_cols = ["acq_method_filled", "bi_limit_group", "digital_contact_ind", "geo_group",
+            "has_prior_carrier", "household_group", "pay_type_code", "pol_edeliv_ind_filled",
+            "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind"]
+
+
+X_train[cat_cols] = X_train[cat_cols].astype("category")
+X_val_cat[cat_cols] = X_val_cat[cat_cols].astype("category")
+
+
+cv = KFold(n_splits=10, shuffle=True, random_state=random_state)
+
+lgbm = lgb.LGBMRegressor(random_state=random_state, objective="regression", verbose=-1)
+
+param_grid = {
+    "n_estimators": [100, 200],
+    "learning_rate": [0.08, 0.11],          
+    "max_depth": [3, 5],
+    "learning_rate": [0.05, 0.1],
+    "min_child_samples": [10, 20]             
+}
+
+gs_lgbm = GridSearchCV(
+    estimator=lgbm,
+    param_grid=param_grid,
+    scoring="neg_root_mean_squared_error",
+    cv=cv,
+    n_jobs=-1,
+    refit=True)
+
+gs_lgbm.fit(X_train, y_train, categorical_feature=cat_cols)
+
+print("10-Fold CV RMSE:", -gs_lgbm.best_score_) 
+print("Optimal Parameters:", gs_lgbm.best_params_)
+print("Optimal Estimator:", gs_lgbm.best_estimator_)
+
+final_model_lgbm = gs_lgbm.best_estimator_
+
+selected_features_lgbm = X_train.columns[np.array(final_model_lgbm.feature_importances_) > 0]
+print("Selected features for LightGBM:")
+print(selected_features_lgbm)
 
 
 ############################################## CatBoost Regressor Model ############################################################
+train_pool = cb.Pool(data=X_train, label=y_train, cat_features=cat_cols)
+val_pool = cb.Pool(data=X_val_cat, label=y_val, cat_features=cat_cols)
+final_model_cat_basic = cb.CatBoostRegressor(loss_function="RMSE", random_seed=random_state, train_dir="catboost_basic")
+final_model_cat_basic.fit(train_pool, eval_set=val_pool, verbose=True)
 
 
 
+############################################## Evaluation ############################################################
+def evaluate_model(model, X, y, name):
+    predictions = model.predict(X)
+    rmse = root_mean_squared_error(y, predictions)
+    print(f"{name} Performance:")
+    print(f"Root Mean Squared Error: {rmse:.4f}")
+
+
+
+evaluate_model(ols_model, X_val_ols, y_val, "OLS Regression")
+evaluate_model(glm_lr_model, X_val_ols, y_val, "GLM (Gaussian)")
+evaluate_model(con_ols_model, X_val_ols, y_val, "Constrained GLM (Gaussian)")
+
+"""
+Summary:
+using Gaussian for count data (call_counts) is not ideal
+"""
+evaluate_model(final_model_ridge, X_val_reg, y_val, "Ridge Regression")
+evaluate_model(final_model_lasso, X_val_reg, y_val, "Lasso Regression")
+
+"""
+Summary:
+Regularized regression models still use assume Gaussian distribution for the target variable
+using Gaussian for count data (call_counts) is not ideal
+"""
+
+evaluate_model(final_model_dt, X_val_tree, y_val, "Decision Tree Regressor")
+evaluate_model(final_model_rf, X_val_tree, y_val, "Random Forest Regressor")
+evaluate_model(final_model_xgb, X_val_tree, y_val, "XGBoost Regressor")
+
+
+evaluate_model(final_model_lgbm, X_val_cat, y_val, "LightGBM Regressor")
+evaluate_model(final_model_cat_basic, X_val_cat, y_val, "CatBoost Regressor")
