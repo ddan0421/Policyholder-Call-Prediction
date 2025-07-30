@@ -4,7 +4,7 @@ import models
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import Ridge, Lasso
 from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, ExtraTreesRegressor
+from sklearn.ensemble import RandomForestRegressor
 import xgboost as xgb
 import lightgbm as lgb
 from sklearn.model_selection import GridSearchCV, KFold
@@ -321,6 +321,91 @@ print(selected_features_dt)
 y_pred = final_model_dt.predict(X_val)
 rmse = root_mean_squared_error(y_val, y_pred)
 print(f"RMSE on validation set for Decision Tree: {rmse}")
+
+
+
+############################################## Random Forest Tree Regressor Model ############################################################
+cv = KFold(n_splits=10, shuffle=True, random_state=random_state)
+rf = RandomForestRegressor(random_state=random_state, bootstrap=True)
+
+param_grid = {
+    "n_estimators": [50, 100, 200], 
+    "max_depth": [3, 5, 10], 
+    "min_samples_split": [2, 5],  
+    "min_samples_leaf": [1, 2], 
+    "max_features": ["sqrt", "log2"],  
+}
+
+gs_rf = GridSearchCV(estimator=rf,
+                     param_grid=param_grid,
+                     scoring="neg_root_mean_squared_error", 
+                     cv=cv,
+                     n_jobs=-1,
+                     refit=True)
+
+gs_rf.fit(X_train, y_train)
+
+print("10-Fold CV RMSE:", -gs_rf.best_score_) 
+print("Optimal Parameters:", gs_rf.best_params_)
+print("Optimal Estimator:", gs_rf.best_estimator_)
+
+final_model_rf = gs_rf.best_estimator_
+
+selected_features_rf = X_train.columns[np.array(final_model_rf.feature_importances_) > 0]
+print("Selected features for Random Forest:")
+print(selected_features_rf)
+
+# Evaluation
+y_pred = final_model_rf.predict(X_val)
+rmse = root_mean_squared_error(y_val, y_pred)
+print(f"RMSE on validation set for Random Forest: {rmse}")
+
+
+
+############################################## XGBoost Regressor Model ############################################################
+cv = KFold(n_splits=10, shuffle=True, random_state=random_state)
+xgb_model = xgb.XGBRegressor(random_state=random_state, objective="reg:squarederror")
+
+param_grid = {
+    "n_estimators": [180, 200],  
+    "learning_rate": [0.07, 0.10], 
+    "max_depth": [2, 3, 4],  
+    "min_child_weight": [2, 3], 
+    "subsample": [0.78, 0.8,],  
+    "colsample_bytree": [0.728, 0.75],  
+    "reg_alpha": [0, 0.5],  
+    "reg_lambda": [0.281, 1]  
+}
+
+gs_xgb = GridSearchCV(
+    estimator=xgb_model,
+    param_grid=param_grid,
+    scoring="neg_root_mean_squared_error",
+    cv=cv,
+    n_jobs=-1,
+    refit=True)
+
+gs_xgb.fit(X_train, y_train)
+
+print("10-Fold CV RMSE:", -gs_xgb.best_score_)  
+print("Optimal Parameters:", gs_xgb.best_params_)
+print("Optimal Estimator:", gs_xgb.best_estimator_)
+
+final_model_xgb = gs_xgb.best_estimator_
+
+selected_features_xgb_final = X_train.columns[np.array(final_model_xgb.feature_importances_) > 0]
+print("Selected features for XGBoost:")
+print(selected_features_xgb_final)
+
+# Evaluation
+y_pred = final_model_xgb.predict(X_val)
+rmse = root_mean_squared_error(y_val, y_pred)
+print(f"RMSE on validation set for XGBoost: {rmse}")
+
+############################################## LightGBM Regressor Model ############################################################
+
+
+############################################## CatBoost Regressor Model ############################################################
 
 
 
