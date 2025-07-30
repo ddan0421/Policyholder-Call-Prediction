@@ -100,13 +100,13 @@ y_pred = ols_model.predict(X_val)
 rmse = root_mean_squared_error(y_val, y_pred)
 print(f"RMSE on validation set for OLS: {rmse}")
 
-y_pred_glm = glm_lr_model.predict(X_val)
-rmse_glm = root_mean_squared_error(y_val, y_pred_glm)
-print(f"RMSE on validation set for GLM (Gaussian): {rmse_glm}")
+y_pred = glm_lr_model.predict(X_val)
+rmse = root_mean_squared_error(y_val, y_pred)
+print(f"RMSE on validation set for GLM (Gaussian): {rmse}")
 
-y_pred_con = con_ols_model.predict(X_val)
-rmse_con = root_mean_squared_error(y_val, y_pred_con)
-print(f"RMSE on validation set for Constrained GLM (Gaussian): {rmse_con}")
+y_pred = con_ols_model.predict(X_val)
+rmse = root_mean_squared_error(y_val, y_pred)
+print(f"RMSE on validation set for Constrained GLM (Gaussian): {rmse}")
 
 """
 Summary:
@@ -235,9 +235,9 @@ y_pred = final_model_ridge.predict(X_val)
 rmse = root_mean_squared_error(y_val, y_pred)
 print(f"RMSE on validation set for Ridge: {rmse}")
 
-y_pred_glm = final_model_lasso.predict(X_val)
-rmse_glm = root_mean_squared_error(y_val, y_pred_glm)
-print(f"RMSE on validation set for LASSO: {rmse_glm}")
+y_pred = final_model_lasso.predict(X_val)
+rmse = root_mean_squared_error(y_val, y_pred)
+print(f"RMSE on validation set for LASSO: {rmse}")
 
 """
 Summary:
