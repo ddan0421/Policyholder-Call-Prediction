@@ -176,7 +176,7 @@ gs_ridge = GridSearchCV(estimator=ridge,
 
 gs_ridge.fit(X_train, y_train)
 
-print("10-Fold CV RMSE (log-transformed scale):", -gs_ridge.best_score_) 
+print("10-Fold CV RMSE:", -gs_ridge.best_score_) 
 print("Optimal Parameter:", gs_ridge.best_params_)
 print("Optimal Estimator:", gs_ridge.best_estimator_)
 
