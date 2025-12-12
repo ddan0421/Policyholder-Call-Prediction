@@ -161,14 +161,14 @@ param_grid = {
 
 gs_knn = GridSearchCV(estimator=knn,
                       param_grid=param_grid,
-                      scoring="accuracy",
+                      scoring="neg_log_loss",
                       cv=cv,
                       n_jobs=-1,
                       refit=True)
 
 gs_knn.fit(X_train, y_train_class)
 
-print("10-Fold CV accuracy:", -gs_knn.best_score_) 
+print("10-Fold CV log loss:", -gs_knn.best_score_) 
 print("Optimal Parameter:", gs_knn.best_params_)
 print("Optimal Estimator:", gs_knn.best_estimator_)
 
