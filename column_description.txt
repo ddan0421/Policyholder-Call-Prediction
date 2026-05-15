@@ -192,47 +192,76 @@ Step 3: Use KNN to impute missing categorical values for these categorical varia
 ** Use NonAuto Train to train KNN to impute NonAuto Train, NonAuto Val, and NonAuto Test
 ** Use Auto Train to train KNN to impute Auto Train, Auto Val, and Auto Test
 
-For Linear Regression, GLM, and SVM (Linear Kernel) models:
-Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical) (Drop one when using one-hot encoding)
-** Remember to reindex the validation and test sets to match the one-hot encoded columns of the training set. X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-Step 5: Scale Numerical (standardization) for train and use the same mean and st dev for validation and test sets
+Model Developments
+
+1. Baseline Models
+------------------
+
+A. Poisson Regression
+- First baseline for count prediction
+- Assumes: Var(Y) = E(Y)
+- Likely too restrictive due to overdispersion
+- Used only as a reference benchmark
+
+B. Negative Binomial Regression
+- Strong classical baseline (IMPORTANT ADDITION)
+- Handles overdispersion (Var > Mean)
+- Better suited for:
+    - heavy right tail
+    - bursty count structure
+    - heterogeneous variance
+
+Recommended evaluation metrics:
+- RMSE
+- AIC (for classical models)
 
 
-For SVM (RBF / Poly Kernels):
-Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical) (Don't drop one when using one-hot encoding)
-** Remember to reindex the validation and test sets to match the one-hot encoded columns of the training set. X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-Step 5: Scale Numerical (standardization) for train and use the same mean and st dev for validation and test sets
-
-For Regularized models (Ridge, Lasso):
-Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical) (Don't drop one when using one-hot encoding) 
-https://inmachineswetrust.com/posts/drop-first-columns/#cell6
-** Remember to reindex the validation and test sets to match the one-hot encoded columns of the
-Step 5: Scale Numerical (standardization) for train and use the same mean and st dev for validation and test sets
-
-For Distance-based models (like KNN):
-Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical) (Don't drop one when using one-hot encoding since multicollinearity is not an issue for these models)
-** Remember to reindex the validation and test sets to match the one-hot encoded columns of the training set. X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-Step 5: Scale Numerical (normalization) for train and use the same mean and st dev for validation and test sets
-
-For General ML models (Tree-based models (DT, RF, XGB)) (Except CatBoost, LightGBM, KNN, and SVM):
-Step 4: Encoding categorical (one-hot for nominal and ordinal mapping for ordinal categorical) (Don't drop one when using one-hot encoding since multicollinearity is not an issue for these models)
-** Remember to reindex the validation and test sets to match the one-hot encoded columns of the training set. X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-- no need for scaling numerical variables since most ML models can handle different scales of numerical features
-
-For CatBoost and LightGBM models:
-- No need for encoding categorical variables or scaling numerical variables
+C. Zero-Inflated Negative Binomial (ZINB)
+- Handles:
+    - overdispersion
+    - excess zeros (if structurally generated)
+- Useful if zeros come from a separate generating process
 
 
+2. Advanced Models
+------------------
 
-| Model Type                       | Categorical Encoding               | Drop One? | Scale Numerical?          | Notes                                                                                                               |
-| -------------------------------- | ---------------------------------- | --------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **Linear Regression / GLM**      | One-hot (nominal), Ordinal mapping | ✅ Yes     | ✅ Standardization         | Avoid multicollinearity. Standardization improves interpretability and convergence.                                 |
-| **SVM (Linear Kernel)**          | One-hot (nominal), Ordinal mapping | ✅ Yes     | ✅ Standardization         | Drop-one avoids perfect collinearity; standardization required due to hinge loss optimization.                      |
-| **SVM (RBF / Poly Kernel)**      | One-hot (nominal), Ordinal mapping | ❌ No      | ✅ Standardization         | Nonlinear kernels can handle redundancy; scaling still critical.                                                    |
-| **Ridge / Lasso**                | One-hot (nominal), Ordinal mapping | ❌ No      | ✅ Standardization         | Drop-one not required due to regularization ([link](https://inmachineswetrust.com/posts/drop-first-columns/#cell6)) |
-| **KNN**                          | One-hot (nominal), Ordinal mapping | ❌ No      | ✅ Normalization (Min-Max) | Distance-based, sensitive to scale                                                                                  |
-| **Tree-based (DT, RF, XGBoost)** | One-hot (nominal), Ordinal mapping | ❌ No      | ❌ Not needed              | Trees are scale- and collinearity-invariant                                                                         |
-| **CatBoost / LightGBM**          | Native categorical handling        | ❌ N/A     | ❌ Not needed              | CatBoost handles raw categoricals natively; LightGBM requires categorical column specified as type category.        |
+A. Hurdle Model (Two-Stage)
+
+Stage 1: Classification
+- Predict: P(Y > 0)
+
+Stage 2: Conditional Regression (ONLY for Y > 0)
+- Predict: E[Y | Y > 0]
+
+Recommended Stage 2 models:
+- Negative Binomial Regression
+or
+- LightGBM with Tweedie objective
+
+Final prediction:
+    ŷ = P(Y > 0) × E[Y | Y > 0]
+
+
+B. Single-Stage Boosting Baseline (IMPORTANT COMPARISON)
+- LightGBM / XGBoost with Tweedie objective
+- No hurdle separation
+
+Why include:
+- Sometimes matches or beats hurdle models
+- Strong baseline for skewed + overdispersed data
+
+
+3. Recommended Experiment Order
+--------------------------------
+
+1. Poisson Regression
+2. Negative Binomial Regression
+3. Zero-Inflated Negative Binomial (ZINB)
+4. Hurdle Model (Binary + Negative Binomial)
+5. Hurdle Model (Binary + LightGBM Tweedie)
+6. Single LightGBM (Tweedie, no hurdle)
+
 
 
 """
