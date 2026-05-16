@@ -1,6 +1,6 @@
 import duckdb
 import os
-from gdrive_download import download_from_drive
+from s1_data.gdrive_download import download_from_drive
 
 data_dict = {
     "train.csv": "1tDbkww6-LElQu-dc5elOjiLJbX-Z_kkY",
@@ -24,12 +24,12 @@ default_na = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN",
 nullstr_sql = "[" + ", ".join(f"'{x}'" for x in default_na) + "]"
 
 for table, path in {"train": train_path, "test": test_path}.items():
-    target_col = ', CAST(call_counts AS BIGINT) AS "call_counts"' if table == "train" else ""
+    target_col = ', CAST(call_counts AS INTEGER) AS "call_counts"' if table == "train" else ""
     conn.execute(f"""
         CREATE OR REPLACE TABLE {table} AS
         SELECT
-            CAST(id AS BIGINT) AS "id"
-            , CAST("12m_call_history" AS BIGINT) AS "12m_call_history"
+            CAST(id AS INTEGER) AS "id"
+            , CAST("12m_call_history" AS INTEGER) AS "12m_call_history"
             , CAST(acq_method AS VARCHAR) AS "acq_method"
             , CAST(ann_prm_amt AS DOUBLE) AS "ann_prm_amt"
             , CAST(bi_limit_group AS VARCHAR) AS "bi_limit_group"
