@@ -22,7 +22,7 @@ Step 1: Split data into NonAuto and Auto
 
 Step 2: Hold out 20% of auto train for validation while fitting KNN imputation on the other 80%
 
-Step 3: Use KNN to impute acq_method (missing)
+Step 3: Use KNN to impute pol_edeliv_ind (-2 as missing)
 
 Step 4: Export auto_train_imputed and auto_test_imputed to DuckDB
 """
@@ -45,7 +45,7 @@ test = load_df(conn, "auto_test", add_id=False)
 
 train_split, val_split = train_test_split(train, test_size=0.2, random_state=42)
 
-# Step 3: KNN impute acq_method (missing)
+# Step 3: KNN impute pol_edeliv_ind (-2)
 def knn_prep(conn, data, scaler=None):
     conn.register("data", data)
 
@@ -60,31 +60,30 @@ def knn_prep(conn, data, scaler=None):
             newest_veh_age,
             tenure_at_snapshot,
             CAST(CASE 
-                WHEN acq_method = 'method1' THEN 1
-                WHEN acq_method = 'method2' THEN 2
-                WHEN acq_method = 'method3' THEN 3
-                WHEN acq_method = 'method4' THEN 4
+                WHEN pol_edeliv_ind = 0 THEN 0
+                WHEN pol_edeliv_ind = 1 THEN 1
+                WHEN pol_edeliv_ind = -1 THEN -1
                 ELSE NULL 
-            END AS INTEGER) AS acq_method_encoded
+            END AS INTEGER) AS pol_edeliv_ind_encoded
         FROM data;
     """
     conn.execute(query)
     knn_train = conn.execute("""
         SELECT * FROM knn_prep
-        WHERE acq_method_encoded IS NOT NULL
+        WHERE pol_edeliv_ind_encoded IS NOT NULL
         ORDER BY id;
     """).fetch_df()
     knn_test = conn.execute("""
         SELECT * FROM knn_prep
-        WHERE acq_method_encoded IS NULL
+        WHERE pol_edeliv_ind_encoded IS NULL
         ORDER BY id;
     """).fetch_df()
 
-    X_train_knn = knn_train.drop(["acq_method_encoded", "id"], axis=1)
-    y_train_knn = knn_train[["id", "acq_method_encoded"]].copy()
+    X_train_knn = knn_train.drop(["pol_edeliv_ind_encoded", "id"], axis=1)
+    y_train_knn = knn_train[["id", "pol_edeliv_ind_encoded"]].copy()
 
-    X_test_knn = knn_test.drop(["acq_method_encoded", "id"], axis=1)
-    y_test_knn = knn_test[["id", "acq_method_encoded"]].copy()
+    X_test_knn = knn_test.drop(["pol_edeliv_ind_encoded", "id"], axis=1)
+    y_test_knn = knn_test[["id", "pol_edeliv_ind_encoded"]].copy()
 
     if scaler is None:
         scaler = StandardScaler()
@@ -98,60 +97,52 @@ def knn_prep(conn, data, scaler=None):
     return X_train_scaled, y_train_knn, X_test_scaled, y_test_knn, scaler
 
 
-def impute_df(conn, data, acq_method_imputed):
+def impute_df(conn, data, pol_edeliv_ind_imputed):
     conn.register("data", data)
-    conn.register("acq_method_imputed", acq_method_imputed)
+    conn.register("pol_edeliv_ind_imputed", pol_edeliv_ind_imputed)
 
     query = """
     WITH cte AS (SELECT 
         a.*,
         CASE 
-            WHEN a.acq_method = 'missing' THEN 
-                CASE 
-                    WHEN b.acq_method_encoded = 1 THEN 'method1'
-                    WHEN b.acq_method_encoded = 2 THEN 'method2'
-                    WHEN b.acq_method_encoded = 3 THEN 'method3'
-                    WHEN b.acq_method_encoded = 4 THEN 'method4'
-                    ELSE NULL
-                END
-            ELSE a.acq_method
-        END AS acq_method_filled
+            WHEN a.pol_edeliv_ind = -2 THEN b.pol_edeliv_ind_encoded
+            ELSE a.pol_edeliv_ind
+        END AS pol_edeliv_ind_filled
     FROM data AS a
-    LEFT JOIN acq_method_imputed AS b
+    LEFT JOIN pol_edeliv_ind_imputed AS b
     ON a.id = b.id)
 
-    SELECT * EXCLUDE (acq_method)
+    SELECT * EXCLUDE (pol_edeliv_ind)
     FROM cte;
     """
     result = conn.execute(query).fetch_df()
     conn.unregister("data")
-    conn.unregister("acq_method_imputed")
+    conn.unregister("pol_edeliv_ind_imputed")
 
     return result
 
 
-def apply_acq_method_imputation(conn, data, knn_imputer, scaler):
-    """Run KNN prediction on missing acq_method rows and return data with acq_method_filled."""
+def apply_imputation(conn, data, knn_imputer, scaler):
     _, y_train_knn, X_test_knn, y_test_knn, _ = knn_prep(conn, data, scaler=scaler)
     if len(X_test_knn) > 0:
-        y_test_knn["acq_method_encoded"] = knn_imputer.predict(X_test_knn)
-    acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
-    return impute_df(conn, data, acq_method_imputed)
+        y_test_knn["pol_edeliv_ind_encoded"] = knn_imputer.predict(X_test_knn)
+    pol_edeliv_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
+    return impute_df(conn, data, pol_edeliv_ind_imputed)
 
 
 # Fit scaler + KNN on train_split, apply to val_split and test
-X_train_knn, y_train_knn, X_test_knn, y_test_knn, acq_scaler = knn_prep(conn, train_split)
+X_train_knn, y_train_knn, X_test_knn, y_test_knn, pol_scaler = knn_prep(conn, train_split)
 
 knn_imputer = KNeighborsClassifier(n_neighbors=5)
-knn_imputer.fit(X_train_knn, y_train_knn["acq_method_encoded"].values)
+knn_imputer.fit(X_train_knn, y_train_knn["pol_edeliv_ind_encoded"].values)
 
 if len(X_test_knn) > 0:
-    y_test_knn["acq_method_encoded"] = knn_imputer.predict(X_test_knn)
-acq_method_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
-train_split = impute_df(conn, train_split, acq_method_imputed)
+    y_test_knn["pol_edeliv_ind_encoded"] = knn_imputer.predict(X_test_knn)
+pol_edeliv_ind_imputed = pd.concat([y_train_knn, y_test_knn], axis=0)
+train_split = impute_df(conn, train_split, pol_edeliv_ind_imputed)
 
-val_split = apply_acq_method_imputation(conn, val_split, knn_imputer, acq_scaler)
-test = apply_acq_method_imputation(conn, test, knn_imputer, acq_scaler)
+val_split = apply_imputation(conn, val_split, knn_imputer, pol_scaler)
+test = apply_imputation(conn, test, knn_imputer, pol_scaler)
 
 # Step 4: Recombine train splits and export
 train_imputed = pd.concat([train_split, val_split], axis=0)
