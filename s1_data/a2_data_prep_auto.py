@@ -89,22 +89,26 @@ def knn_prep(conn, data, scaler=None):
     knn_train = pd.get_dummies(knn_train, columns=["geo_group"], prefix="geo", dtype="int8")
     knn_test  = pd.get_dummies(knn_test,  columns=["geo_group"], prefix="geo", dtype="int8")
 
-    X_train_knn = knn_train.drop(["pol_edeliv_ind_encoded", "id"], axis=1)
+    X_train_knn = knn_train.drop(["pol_edeliv_ind_encoded", "id"], axis=1).copy()
     y_train_knn = knn_train[["id", "pol_edeliv_ind_encoded"]].copy()
 
-    X_test_knn = knn_test.drop(["pol_edeliv_ind_encoded", "id"], axis=1)
+    X_test_knn = knn_test.drop(["pol_edeliv_ind_encoded", "id"], axis=1).copy()
     y_test_knn = knn_test[["id", "pol_edeliv_ind_encoded"]].copy()
+
+    # Scale continuous numeric columns. Leave binary indicators
+    numeric_cols = ["12m_call_history", "ann_prm_amt",
+                    "household_policy_counts", "tenure_at_snapshot"]
 
     if scaler is None:
         scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train_knn)
+        X_train_knn[numeric_cols] = scaler.fit_transform(X_train_knn[numeric_cols])
     else:
-        X_train_scaled = scaler.transform(X_train_knn)
-    X_test_scaled = scaler.transform(X_test_knn)
+        X_train_knn[numeric_cols] = scaler.transform(X_train_knn[numeric_cols])
+    X_test_knn[numeric_cols] = scaler.transform(X_test_knn[numeric_cols])
 
     conn.unregister("data")
     conn.execute("""DROP TABLE knn_prep;""")
-    return X_train_scaled, y_train_knn, X_test_scaled, y_test_knn, scaler
+    return X_train_knn, y_train_knn, X_test_knn, y_test_knn, scaler
 
 
 def impute_df(conn, data, pol_edeliv_ind_imputed):
