@@ -107,11 +107,6 @@ max         97.000000
 
 NonAuto group has only value -20
 
-Treating newest_veh_age as a Categorical Column: When the value is -20, it is labeled as "Non-Auto". 
-For other values, a label like "Age_8" is used (indicating age 8, for example). 
-This change makes newest_veh_age a categorical feature, which allows you to use it directly in your predictive models without losing the distinction for non-auto policies. Why This Approach? It explicitly separates "non-auto" policies from auto policies based on the vehicle's age. It retains the original values for vehicle age and makes it clear that a distinct category exists for policies without vehicles. It avoids introducing numeric ambiguity by mixing ages with a special value. 
-
-
 
 - pay_type_code - Code indicating the payment method. Could relate to call volume due to billing issues.
 type1    50177
