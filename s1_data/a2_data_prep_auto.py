@@ -23,6 +23,7 @@ Step 1: Split data into NonAuto and Auto
 Step 2: Hold out 20% of auto train for validation while fitting KNN imputation on the other 80%
 
 Step 3: Use KNN to impute pol_edeliv_ind (-2 as missing)
+- This project uses KNeighborsClassifier for imputation; consider KNNImputer as an alternative for directly imputing missing values.
 
 Step 4: Export auto_train_imputed and auto_test_imputed to DuckDB
 """
