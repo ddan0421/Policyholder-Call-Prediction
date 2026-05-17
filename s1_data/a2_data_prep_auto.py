@@ -55,10 +55,11 @@ def knn_prep(conn, data, scaler=None):
             id,
             "12m_call_history",
             ann_prm_amt,
-            home_lot_sq_footage,
             household_policy_counts,
-            newest_veh_age,
             tenure_at_snapshot,
+            digital_contact_ind,
+            has_prior_carrier,
+            geo_group,
             CAST(CASE 
                 WHEN pol_edeliv_ind = 0 THEN 0
                 WHEN pol_edeliv_ind = 1 THEN 1
@@ -78,6 +79,15 @@ def knn_prep(conn, data, scaler=None):
         WHERE pol_edeliv_ind_encoded IS NULL
         ORDER BY id;
     """).fetch_df()
+
+    # One-hot encode geo_group with fixed categories so train/val/test always
+    # produce the same dummy columns in the same order, even if a split happens
+    # to be missing one of the three values.
+    geo_categories = ["rural", "suburban", "urban"]
+    knn_train["geo_group"] = pd.Categorical(knn_train["geo_group"], categories=geo_categories)
+    knn_test["geo_group"]  = pd.Categorical(knn_test["geo_group"],  categories=geo_categories)
+    knn_train = pd.get_dummies(knn_train, columns=["geo_group"], prefix="geo", dtype="int8")
+    knn_test  = pd.get_dummies(knn_test,  columns=["geo_group"], prefix="geo", dtype="int8")
 
     X_train_knn = knn_train.drop(["pol_edeliv_ind_encoded", "id"], axis=1)
     y_train_knn = knn_train[["id", "pol_edeliv_ind_encoded"]].copy()
