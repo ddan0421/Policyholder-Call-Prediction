@@ -19,18 +19,14 @@ Below is the **plan**; implementation is still in progress.
 
 - **Zero-inflated Poisson (ZIP)** — count baseline that adds a zero-inflation layer for excess zeros; the Poisson count part still assumes variance equals mean (often too strict if counts remain overdispersed after accounting for zeros).
 
-- **Negative binomial regression** — handles overdispersion (variance > mean); better for heavy tails and bursty counts.
-
 - **Zero-inflated negative binomial (ZINB)** — if there are many zeros from a separate process than the main count process.
 
 **More advanced**
 
 - **Hurdle (two stages)**  
   - Stage 1: predict P(Y > 0).  
-  - Stage 2: on rows with Y > 0, predict E[Y | Y > 0], e.g. negative binomial or **LightGBM with Tweedie** objective.  
+  - Stage 2: on rows with Y > 0, predict E[Y | Y > 0], e.g. negative binomial or **boosting with NB loss** objective.  
   - Combined: ŷ = P(Y > 0) × E[Y | Y > 0].
-
-- **Single-stage boosting** — LightGBM / XGBoost with **Tweedie** objective (no hurdle), for comparison.
 
 ## Experiment order (planned)
 1. Zero-inflated Poisson (ZIP)
@@ -48,4 +44,22 @@ Below is the **plan**; implementation is still in progress.
 ## Metrics (planned)
 
 - **RMSE** on validation for comparing predictions.  
-- **AIC** for classical models where it applies.
+- **AIC** for classical models where it applies.  
+- **Gini** (relative Gini) — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate among the highest-risk predictions (higher is better vs random ordering). Rows are ordered by prediction; \(a_k\) is the actual call count at rank \(k\); \(N\) is the number of observations.
+
+  **Relative Gini**
+
+  $$
+  \text{Relative Gini}
+  =
+  \frac{
+    \displaystyle\sum_{k=1}^{N}
+    \left(
+      k \cdot a_k - \sum_{i=1}^{k} a_i
+    \right)
+  }{
+    \left( \displaystyle\sum_{i=1}^{N} a_i \right)
+    \cdot
+    \left( \displaystyle\sum_{i=1}^{N} i \right)
+  }
+  $$
