@@ -45,21 +45,12 @@ Below is the **plan**; implementation is still in progress.
 
 - **RMSE** on validation for comparing predictions.  
 - **AIC** for classical models where it applies.  
-- **Gini** (relative Gini) — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate among the highest-risk predictions (higher is better vs random ordering). Rows are ordered by prediction; \(a_k\) is the actual call count at rank \(k\); \(N\) is the number of observations.
+- **Gini** (relative Gini) — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate among the highest-risk predictions (higher is better vs random ordering).
 
-  **Relative Gini**
+### Relative Gini
 
-  $$
-  \text{Relative Gini}
-  =
-  \frac{
-    \displaystyle\sum_{k=1}^{N}
-    \left(
-      k \cdot a_k - \sum_{i=1}^{k} a_i
-    \right)
-  }{
-    \left( \displaystyle\sum_{i=1}^{N} a_i \right)
-    \cdot
-    \left( \displaystyle\sum_{i=1}^{N} i \right)
-  }
-  $$
+Sort rows by predicted call counts (descending). Let $N$ be the number of observations and $a_k$ the actual call count at rank $k$.
+
+$$
+\text{Relative Gini} = \frac{\sum_{k=1}^{N} \left( k \cdot a_k - \sum_{i=1}^{k} a_i \right)}{\left( \sum_{i=1}^{N} a_i \right) \left( \sum_{i=1}^{N} i \right)}
+$$
