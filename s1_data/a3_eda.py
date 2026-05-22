@@ -23,6 +23,12 @@ auto_train = load_df(conn, "Auto_train_imputed", add_id=False)
 auto_test = load_df(conn, "Auto_train_imputed", add_id=False)
 
 
+# =====================================================================
+# Section 1: Call counts analysis (response variable)
+#   01_ overall histogram + summary stats per segment
+#   02_ non-zero-only histogram + summary stats per segment (stage-2 view)
+# =====================================================================
+
 # Call counts analysis: summary stats + histogram per segment
 for name, df in [("Auto", auto_train), ("NonAuto", nonauto_train)]:
     s = df["call_counts"]
@@ -83,7 +89,41 @@ fig.savefig("plots/02_call_counts_histogram_nonzero.png", dpi=150, bbox_inches="
 plt.close(fig)
 print("[saved] plots/02_call_counts_histogram_nonzero.png")
 
+"""
+Notes on call_counts modeling
 
+call_counts is overdispersed (variance >> mean), which violates the Poisson
+assumption that mean == variance. It also has many zeros, motivating either
+a zero-inflated or hurdle approach.
+
+Reference:
+https://stats.stackexchange.com/questions/81457/what-is-the-difference-between-zero-inflated-and-hurdle-models
+
+Both models are described in two parts:
+1. On/off part (binary): system is "off" with probability pi (only zeros) and
+   "on" with probability 1 - pi. Same in both models.
+2. Counting part (when "on"): this is where the two differ.
+     - Zero-inflated: count distribution can still produce zeros.
+     - Hurdle:        count distribution is zero-truncated (must be > 0).
+
+Equivalently:
+- Hurdle assumes one process generates zeros (the off state).
+- Zero-inflated assumes two processes can generate zeros (off state OR the
+  count distribution producing a zero).
+
+Plan in this repo (see README):
+- Baselines:    ZIP, ZINB.
+- Hurdle:       stage 1 logistic for P(Y > 0); stage 2 NB or LightGBM/XGBoost
+                with NB loss for E[Y | Y > 0] on rows with Y > 0.
+                Combined prediction: y_hat = P(Y > 0) * E[Y | Y > 0].
+- Experiment order: ZIP -> ZINB -> Hurdle(binary + NB) -> Hurdle(binary + boosting).
+"""
+# =====================================================================
+# Section 2: Auto vs NonAuto variable comparison (03_)
+#   - box_whisker_col -> vertical box-and-whisker
+#   - bar_col         -> bar chart
+#   - if a variable exists in only one segment, show a single plot
+# =====================================================================
 
 box_whisker_col = ["12m_call_history", "ann_prm_amt", "home_lot_sq_footage", "newest_veh_age",
                    "tenure_at_snapshot"]
@@ -247,6 +287,11 @@ for col in bar_col:
 
 
 
+# =====================================================================
+# Section 3: Cap household_policy_counts (04_)
+#   uncapped vs capped, side-by-side bar charts (Auto + NonAuto)
+# =====================================================================
+
 # Cap household_policy_counts: uncapped vs capped (bar charts)
 col = "household_policy_counts"
 auto_cap = 4
@@ -390,6 +435,14 @@ def plot_conditional_mean_curves(valid_table, varlist, segment, prefix):
         print(f"[saved] plots/{filename}")
 
 
+# =====================================================================
+# Section 4: Response curves and conditional means by predictor level
+#   05_ Auto    response curves    (P(y > 0))
+#   06_ Auto    conditional means  (E[y | y > 0])
+#   07_ NonAuto response curves    (P(y > 0))
+#   08_ NonAuto conditional means  (E[y | y > 0])
+# =====================================================================
+
 # Auto: build validdat with Auto-specific bins/caps, then plot response curves
 auto_varlist = [
     "binned_12m_call_history", "acq_method", "binned_ann_prm_amt", "bi_limit_group",
@@ -464,8 +517,13 @@ plot_conditional_mean_curves(nonauto_valid_table, nonauto_varlist, "NonAuto", "0
 
 
 
+# =====================================================================
+# Section 5: Cap + log1p transform comparison (09_)
+#   raw vs log1p(min(x, cap)) using vertical boxplots, Auto vs NonAuto
+#   Caps match the binning thresholds applied per segment above.
+# =====================================================================
+
 # Cap + log1p comparison (raw vs log1p(min(x, cap))) using vertical boxplots
-# Caps match the binning thresholds applied per segment above.
 log_caps = {
     "12m_call_history":   {"Auto": 40,   "NonAuto": 30},
     "ann_prm_amt":        {"Auto": 7200, "NonAuto": 7200},
