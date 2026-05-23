@@ -14,8 +14,8 @@ def save_df(conn, df, table_name, add_id=True):
 
     conn.unregister(temp_name)
 
-def load_df(conn, table_name, add_id=True):
-    exclude_id = "EXCLUDE (Id)" if add_id else ""
+def load_df(conn, table_name, delete_id=True):
+    exclude_id = "EXCLUDE (Id)" if delete_id else ""
     query = f"""
         SELECT * {exclude_id}
         FROM {table_name}

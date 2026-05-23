@@ -16,11 +16,11 @@ database_path = os.path.join(base_folder, database)
 conn = duckdb.connect(database=database_path, read_only=False)
 
 
-nonauto_train = load_df(conn, "NonAuto_train_imputed", add_id=False)
-nonauto_test = load_df(conn, "NonAuto_test_imputed", add_id=False)
+nonauto_train = load_df(conn, "NonAuto_train_imputed", delete_id=False)
+nonauto_test = load_df(conn, "NonAuto_test_imputed", delete_id=False)
 
-auto_train = load_df(conn, "Auto_train_imputed", add_id=False)
-auto_test = load_df(conn, "Auto_train_imputed", add_id=False)
+auto_train = load_df(conn, "Auto_train_imputed", delete_id=False)
+auto_test = load_df(conn, "Auto_train_imputed", delete_id=False)
 
 
 # =====================================================================
