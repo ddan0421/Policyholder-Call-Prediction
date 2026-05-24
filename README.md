@@ -17,6 +17,8 @@ Below is the **plan**; implementation is still in progress.
 
 **Baselines**
 
+- **Poisson GLM** — simplest count regression with a log link; assumes variance equals mean and ignores excess zeros. Used as a reference benchmark for ZIP/ZINB.
+
 - **Zero-inflated Poisson (ZIP)** — count baseline that adds a zero-inflation layer for excess zeros; the Poisson count part still assumes variance equals mean (often too strict if counts remain overdispersed after accounting for zeros).
 
 - **Zero-inflated negative binomial (ZINB)** — if there are many zeros from a separate process than the main count process.
@@ -29,16 +31,20 @@ Below is the **plan**; implementation is still in progress.
   - Combined: ŷ = P(Y > 0) × E[Y | Y > 0].
 
 ## Experiment order (planned)
-1. Zero-inflated Poisson (ZIP)
+1. Poisson GLM (reference baseline)
+    https://www.statsmodels.org/dev/generated/statsmodels.genmod.generalized_linear_model.GLM.html
+
+2. Zero-inflated Poisson (ZIP)
     https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedPoisson.html
-2. Zero-inflated negative binomial (ZINB)  
+
+3. Zero-inflated negative binomial (ZINB)  
     Statistical ZINB regression: https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedNegativeBinomialP.html
     Bayesian ZINB modeling: https://www.pymc.io/projects/docs/en/stable/api/distributions/generated/pymc.ZeroInflatedNegativeBinomial.html
 
-3. Hurdle: binary + negative binomial  
+4. Hurdle: binary + negative binomial  
     statsmodels negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.discrete_model.NegativeBinomial.html
 
-4. Hurdle: binary + boosting (with NB loss)
+5. Hurdle: binary + boosting (with NB loss)
     xgboost negative-binomial: https://xgboost-distribution.readthedocs.io/en/latest/api/xgboost_distribution.XGBDistribution.html
 
 ## Metrics (planned)
