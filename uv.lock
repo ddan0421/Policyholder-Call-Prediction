@@ -271,6 +271,18 @@ wheels = [
 ]
 
 [[package]]
+name = "patsy"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/be/44/ed13eccdd0519eff265f44b670d46fbb0ec813e2274932dc1c0e48520f7d/patsy-1.0.2.tar.gz", hash = "sha256:cdc995455f6233e90e22de72c37fcadb344e7586fb83f06696f54d92f8ce74c0", size = 399942, upload-time = "2025-10-20T16:17:37.535Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/70/ba4b949bdc0490ab78d545459acd7702b211dfccf7eb89bbc1060f52818d/patsy-1.0.2-py2.py3-none-any.whl", hash = "sha256:37bfddbc58fcf0362febb5f54f10743f8b21dd2aa73dec7e7ef59d1b02ae668a", size = 233301, upload-time = "2025-10-20T16:17:36.563Z" },
+]
+
+[[package]]
 name = "pillow"
 version = "12.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -412,6 +424,27 @@ wheels = [
 ]
 
 [[package]]
+name = "statsmodels"
+version = "0.14.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "patsy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/25/a3/4a7a240e9bc9e146fbd9f0c410ecac328a899ca0c4467c72d9b8aa1e4015/statsmodels-0.14.2.tar.gz", hash = "sha256:890550147ad3a81cda24f0ba1a5c4021adc1601080bd00e191ae7cd6feecd6ad", size = 20352531, upload-time = "2024-04-17T08:43:08.541Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/34/97/a4acebeb223fa827bbb16aece2b93d91bf42f88bed39d93afa96b13bce54/statsmodels-0.14.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:eb0ba1ad3627705f5ae20af6b2982f500546d43892543b36c7bca3e2f87105e7", size = 10396398, upload-time = "2024-04-17T08:48:11.057Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/fd/d282f6a0a55c5903dd66c2116589d1973a352739653382c39d70dcfd0fbc/statsmodels-0.14.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:90fd2f0110b73fc3fa5a2f21c3ca99b0e22285cccf38e56b5b8fd8ce28791b0f", size = 10094238, upload-time = "2024-04-17T08:48:23.864Z" },
+    { url = "https://files.pythonhosted.org/packages/a5/80/1b7669f6af12697316888786c97fc1405e085fc6cb0396ce5a7d2d6c8adb/statsmodels-0.14.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ac780ad9ff552773798829a0b9c46820b0faa10e6454891f5e49a845123758ab", size = 10300515, upload-time = "2024-04-17T10:22:11.612Z" },
+    { url = "https://files.pythonhosted.org/packages/08/24/00c0c8dda62ea9ba93b8538f8e2760ca65d6bf92e8c20ac6edb04602a752/statsmodels-0.14.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:55d1742778400ae67acb04b50a2c7f5804182f8a874bd09ca397d69ed159a751", size = 10712980, upload-time = "2024-04-17T10:22:25.752Z" },
+    { url = "https://files.pythonhosted.org/packages/65/fc/4cfc2546f36c41e1d7a684b5401ed51d4f86fbd3976eafefd8e785c36658/statsmodels-0.14.2-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:f870d14a587ea58a3b596aa994c2ed889cc051f9e450e887d2c83656fc6a64bf", size = 10793220, upload-time = "2024-04-17T10:22:38.726Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/53/1e7077d1bf324c1b1055dedb72e1410d089e459a86940e25b28f545f776e/statsmodels-0.14.2-cp312-cp312-win_amd64.whl", hash = "sha256:f450fcbae214aae66bd9d2b9af48e0f8ba1cb0e8596c6ebb34e6e3f0fec6542c", size = 9825600, upload-time = "2024-04-17T08:43:30.297Z" },
+]
+
+[[package]]
 name = "threadpoolctl"
 version = "3.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -443,6 +476,7 @@ dependencies = [
     { name = "pandas" },
     { name = "scikit-learn" },
     { name = "seaborn" },
+    { name = "statsmodels" },
 ]
 
 [package.metadata]
@@ -453,6 +487,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=3.0.3" },
     { name = "scikit-learn", specifier = "==1.5.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "statsmodels", specifier = "==0.14.2" },
 ]
 
 [[package]]
