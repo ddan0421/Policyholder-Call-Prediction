@@ -1,3 +1,4 @@
+import os
 import statsmodels.api as sm
 import pandas as pd
 import numpy as np
@@ -6,6 +7,8 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 from warnings import filterwarnings
 import time
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, log_loss, precision_score, recall_score, f1_score, roc_auc_score
+
+from s1_data.a0_setup_directories import *
 
 filterwarnings("ignore", "divide by zero", category=RuntimeWarning)
 filterwarnings("ignore", "invalid value", category=RuntimeWarning)
@@ -44,6 +47,11 @@ def sm_poisson_glm(X, y, verbose=True):
 
     if verbose:
         print(model.summary())
+
+        summary_path = os.path.join(model_dir, "poisson_glm_model_summary.txt")
+        with open(summary_path, "w") as file:
+            file.write(model.summary().as_text())
+        print(f"Model summary saved to {summary_path}\n")
 
     return model
 
@@ -105,6 +113,11 @@ def sm_zip(X, y, method="bfgs", maxiter=2000, start_params=None, verbose=True):
     if verbose:
         print(model.summary())
 
+        summary_path = os.path.join(model_dir, "zip_model_summary.txt")
+        with open(summary_path, "w") as file:
+            file.write(model.summary().as_text())
+        print(f"Model summary saved to {summary_path}\n")
+
     return model
 
 
@@ -139,6 +152,11 @@ def sm_zinb(X, y, method="bfgs", maxiter=2000, p=2, start_params=None, verbose=T
 
     if verbose:
         print(model.summary())
+
+        summary_path = os.path.join(model_dir, "zinb_model_summary.txt")
+        with open(summary_path, "w") as file:
+            file.write(model.summary().as_text())
+        print(f"Model summary saved to {summary_path}\n")
 
     return model
 
@@ -206,7 +224,7 @@ def sm_logit(X, y, method="ncg", verbose=True):
         print(model.pvalues)
         
         # Save the summary to a text file
-        summary_path = f"logit_model_summary.txt"
+        summary_path = os.path.join(model_dir, "logit_model_summary.txt")
         with open(summary_path, "w") as file:
             file.write(model.summary().as_text())
         print(f"Model summary saved to {summary_path}\n")
@@ -259,7 +277,7 @@ def constrained_sm_logit(X, y, logit_result, thresh, verbose=True):
         print(model.pvalues)
         
         # Save the summary to a text file
-        summary_path = f"constrained_model_summary.txt"
+        summary_path = os.path.join(model_dir, "constrained_logit_model_summary.txt")
         with open(summary_path, "w") as file:
             file.write(model.summary().as_text())
         print(f"Constrained Model summary saved to {summary_path}\n")
@@ -324,7 +342,13 @@ def sm_logit_scale(X, y, method="ncg", verbose=True):
         # Print p-values
         print("\nModel fitting p-values:")
         print(modelobj.pvalues)
-    
+
+        # Save the summary to a text file
+        summary_path = os.path.join(model_dir, "logit_scale_model_summary.txt")
+        with open(summary_path, "w") as file:
+            file.write(modelobj.summary().as_text())
+        print(f"Model summary saved to {summary_path}\n")
+
     return modelobj
 
 #----------------------------------------------------------------------------#
