@@ -51,12 +51,20 @@ Below is the **plan**; implementation is still in progress.
 
 - **RMSE** on validation for comparing predictions.  
 - **AIC** for classical models where it applies.  
-- **Gini** (relative Gini) — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate among the highest-risk predictions (higher is better vs random ordering).
+- **Normalized Gini** — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate at the top of the ranking. Range is roughly $[-1, 1]$; **1.0 = perfect ranking, 0 = random, negative = anti-correlated**.
 
-### Relative Gini
+### Normalized Gini
 
-Sort rows by predicted call counts (descending). Let $N$ be the number of observations and $a_k$ the actual call count at rank $k$.
+Sort rows by predicted call counts (descending; highest-risk first). Let $N$ be the number of observations and $a_i$ the actual call count at rank $i$ (so $a_1$ is at the highest predicted, $a_N$ at the lowest predicted). Define
 
 $$
-\text{Relative Gini} = \frac{\sum_{k=1}^{N} \left( k \cdot a_k - \sum_{i=1}^{k} a_i \right)}{\left( \sum_{i=1}^{N} a_i \right) \left( \sum_{i=1}^{N} i \right)}
+G(\hat y) = \frac{1}{N}\left(\frac{\sum_{k=1}^{N} \sum_{i=1}^{k} a_i}{\sum_{i=1}^{N} a_i} - \frac{N+1}{2}\right)
 $$
+
+Then the normalized Gini is
+
+$$
+\text{Normalized Gini} = \frac{G(\hat y)}{G(y)}
+$$
+
+where $G(y)$ is the same quantity computed with predictions equal to the true counts (perfect ranking).
