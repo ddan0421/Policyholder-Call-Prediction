@@ -16,7 +16,7 @@ database_path = os.path.join(base_folder, database)
 conn = duckdb.connect(database=database_path, read_only=False)
 
 """
-Step 1: Apply cap and log1p transformations
+Step 1: Apply cap and log1p transformations (drop pay_type_code: identical to product_sbtyp)
 Step 2: Split training data into train and validation sets
 Step 3: One-hot encode nominal categorical variables
 Step 4: Standardize numeric variables and save to DuckDB
@@ -44,7 +44,6 @@ def log_cap_transform(conn, df):
             , IF(household_group = '3autodwellingumb', 1, 0) AS _household_group
             , LEAST(household_policy_counts, 4) AS _household_policy_counts
             , newest_veh_age
-            , pay_type_code
             , pol_edeliv_ind_filled
             , prdct_sbtyp_grp
             , product_sbtyp
@@ -66,7 +65,6 @@ def log_cap_transform(conn, df):
         , _household_group AS household_group
         , _household_policy_counts AS household_policy_counts
         , newest_veh_age AS newest_veh_age
-        , pay_type_code AS pay_type_code
         , pol_edeliv_ind_filled AS pol_edeliv_ind
         , prdct_sbtyp_grp AS prdct_sbtyp_grp
         , product_sbtyp AS product_sbtyp
@@ -90,8 +88,8 @@ X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_st
 
 # Step 3: One-hot encode nominal categorical variables
 binary_cat = ["digital_contact_ind", "has_prior_carrier", "household_group"]
-nominal_cat = ["acq_method", "bi_limit_group", "geo_group", "pay_type_code",
-               "pol_edeliv_ind", "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind"]
+nominal_cat = ["acq_method", "bi_limit_group", "geo_group", "pol_edeliv_ind", 
+                "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind"]
 
 X_train_encoded = pd.get_dummies(X_train, columns=nominal_cat, drop_first=True, dtype="int8")
 X_val_encoded = pd.get_dummies(X_val, columns=nominal_cat, drop_first=True, dtype="int8")
