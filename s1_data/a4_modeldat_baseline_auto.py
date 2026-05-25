@@ -108,11 +108,11 @@ X_val_encoded[numeric_cols] = scaler.transform(X_val_encoded[numeric_cols])
 test_encoded[numeric_cols] = scaler.transform(test_encoded[numeric_cols])
 
 tables = {
-    "X_train_base": X_train_encoded,
-    "X_val_base": X_val_encoded,
-    "test_base": test_encoded,
-    "y_train": y_train,
-    "y_val": y_val
+    "X_train_auto_base": X_train_encoded,
+    "X_val_auto_base": X_val_encoded,
+    "test_auto_base": test_encoded,
+    "y_train_auto": y_train,
+    "y_val_auto": y_val
 }
 
 for table_name, df in tables.items():
