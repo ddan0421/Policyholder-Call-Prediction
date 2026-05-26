@@ -8,11 +8,17 @@ from warnings import filterwarnings
 import time
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, log_loss, precision_score, recall_score, f1_score, roc_auc_score
 
-from s1_data.a0_setup_directories import *
-
 filterwarnings("ignore", "divide by zero", category=RuntimeWarning)
 filterwarnings("ignore", "invalid value", category=RuntimeWarning)
 filterwarnings("ignore", "overflow encountered", category=RuntimeWarning)
+
+
+def save_model_summary(model, model_output_dir, filename):
+    os.makedirs(model_output_dir, exist_ok=True)
+    summary_path = os.path.join(model_output_dir, filename)
+    with open(summary_path, "w") as file:
+        file.write(model.summary().as_text())
+    print(f"Model summary saved to {summary_path}\n")
 
 
 ###################################################################################################
@@ -39,7 +45,7 @@ References:
 - X = sm.add_constant(X)
 """
 
-def sm_poisson_glm(X, y, verbose=True):
+def sm_poisson_glm(X, y, model_output_dir, verbose=True):
     X = sm.add_constant(X, has_constant="skip")
 
     pois_model = sm.GLM(y, X, family=sm.families.Poisson())
@@ -47,11 +53,7 @@ def sm_poisson_glm(X, y, verbose=True):
 
     if verbose:
         print(model.summary())
-
-        summary_path = os.path.join(model_dir, "poisson_glm_model_summary.txt")
-        with open(summary_path, "w") as file:
-            file.write(model.summary().as_text())
-        print(f"Model summary saved to {summary_path}\n")
+        save_model_summary(model, model_output_dir, "poisson_glm_model_summary.txt")
 
     return model
 
@@ -94,7 +96,7 @@ def zi_warm_start(X, y):
 - Make sure X has an intercept/constant variable!
 """
 
-def sm_zip(X, y, method="bfgs", maxiter=2000, start_params=None, verbose=True):
+def sm_zip(X, y, model_output_dir, method="bfgs", maxiter=2000, start_params=None, verbose=True):
     X = sm.add_constant(X, has_constant="skip")
 
     zip_model = sm.ZeroInflatedPoisson(
@@ -112,11 +114,7 @@ def sm_zip(X, y, method="bfgs", maxiter=2000, start_params=None, verbose=True):
 
     if verbose:
         print(model.summary())
-
-        summary_path = os.path.join(model_dir, "zip_model_summary.txt")
-        with open(summary_path, "w") as file:
-            file.write(model.summary().as_text())
-        print(f"Model summary saved to {summary_path}\n")
+        save_model_summary(model, model_output_dir, "zip_model_summary.txt")
 
     return model
 
@@ -133,7 +131,7 @@ def sm_zip(X, y, method="bfgs", maxiter=2000, start_params=None, verbose=True):
 - Make sure X has an intercept/constant variable!
 """
 
-def sm_zinb(X, y, method="bfgs", maxiter=2000, p=2, start_params=None, verbose=True):
+def sm_zinb(X, y, model_output_dir, method="bfgs", maxiter=2000, p=2, start_params=None, verbose=True):
     X = sm.add_constant(X, has_constant="skip")
 
     zinb_model = sm.ZeroInflatedNegativeBinomialP(
@@ -152,11 +150,7 @@ def sm_zinb(X, y, method="bfgs", maxiter=2000, p=2, start_params=None, verbose=T
 
     if verbose:
         print(model.summary())
-
-        summary_path = os.path.join(model_dir, "zinb_model_summary.txt")
-        with open(summary_path, "w") as file:
-            file.write(model.summary().as_text())
-        print(f"Model summary saved to {summary_path}\n")
+        save_model_summary(model, model_output_dir, "zinb_model_summary.txt")
 
     return model
 
@@ -200,7 +194,7 @@ def callback(feature_names):
 - X = sm.add_constant(X)
 """
 
-def sm_logit(X, y, method="ncg", verbose=True):
+def sm_logit(X, y, model_output_dir, method="ncg", verbose=True):
     X = sm.add_constant(X, has_constant="skip")
 
     # Define the logit model
@@ -222,12 +216,7 @@ def sm_logit(X, y, method="ncg", verbose=True):
         print(model.params)
         print("\nModel fitting p-values:")
         print(model.pvalues)
-        
-        # Save the summary to a text file
-        summary_path = os.path.join(model_dir, "logit_model_summary.txt")
-        with open(summary_path, "w") as file:
-            file.write(model.summary().as_text())
-        print(f"Model summary saved to {summary_path}\n")
+        save_model_summary(model, model_output_dir, "logit_model_summary.txt")
     
     # # Optionally remove unnecessary data to reduce memory usage
     # model.remove_data()
@@ -238,7 +227,7 @@ def sm_logit(X, y, method="ncg", verbose=True):
 #                  Constrained Binary Logistic Regression                    #
 #----------------------------------------------------------------------------#
 
-def constrained_sm_logit(X, y, logit_result, thresh, verbose=True):
+def constrained_sm_logit(X, y, logit_result, thresh, model_output_dir, verbose=True):
     X = sm.add_constant(X, has_constant="skip")
 
     # setup constraints
@@ -275,12 +264,7 @@ def constrained_sm_logit(X, y, logit_result, thresh, verbose=True):
         print(model.params)
         print("\nModel fitting p-values:")
         print(model.pvalues)
-        
-        # Save the summary to a text file
-        summary_path = os.path.join(model_dir, "constrained_logit_model_summary.txt")
-        with open(summary_path, "w") as file:
-            file.write(model.summary().as_text())
-        print(f"Constrained Model summary saved to {summary_path}\n")
+        save_model_summary(model, model_output_dir, "constrained_logit_model_summary.txt")
 
     return model
 
@@ -290,7 +274,7 @@ def constrained_sm_logit(X, y, logit_result, thresh, verbose=True):
 #----------------------------------------------------------------------------#
 
 
-def sm_logit_scale(X, y, method="ncg", verbose=True):
+def sm_logit_scale(X, y, model_output_dir, method="ncg", verbose=True):
     """
     Fit a binary logistic regression model with scaling.
 
@@ -342,12 +326,7 @@ def sm_logit_scale(X, y, method="ncg", verbose=True):
         # Print p-values
         print("\nModel fitting p-values:")
         print(modelobj.pvalues)
-
-        # Save the summary to a text file
-        summary_path = os.path.join(model_dir, "logit_scale_model_summary.txt")
-        with open(summary_path, "w") as file:
-            file.write(modelobj.summary().as_text())
-        print(f"Model summary saved to {summary_path}\n")
+        save_model_summary(modelobj, model_output_dir, "logit_scale_model_summary.txt")
 
     return modelobj
 
