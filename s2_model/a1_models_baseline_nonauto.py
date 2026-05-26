@@ -5,6 +5,7 @@ import duckdb
 import numpy as np
 import statsmodels.api as sm
 
+from s1_data.a0_setup_directories import non_auto_model_dir
 from s1_data.db_utils import load_df
 from s2_model.models import sm_poisson_glm, sm_zip, sm_zinb, zi_warm_start
 from s3_validation.model_evaluation import statsmodel_report
@@ -42,7 +43,7 @@ X_val_const = sm.add_constant(X_val, has_constant="add")
 print("=" * 80)
 print("Fitting Poisson GLM")
 print("=" * 80)
-pois_result = sm_poisson_glm(X_train_const, y_train)
+pois_result = sm_poisson_glm(X_train_const, y_train, model_output_dir=non_auto_model_dir)
 pois_train_pred = pois_result.predict(X_train_const)
 pois_val_pred = pois_result.predict(X_val_const)
 statsmodel_report("Poisson train", y_train, pois_train_pred, pois_result.aic)
@@ -62,7 +63,7 @@ zinb_start_params = np.r_[infl_start, count_start, 1.0]
 print("=" * 80)
 print("Fitting Zero-Inflated Poisson (ZIP) with feature-driven inflation")
 print("=" * 80)
-zip_result = sm_zip(X_train_const, y_train, start_params=zip_start_params)
+zip_result = sm_zip(X_train_const, y_train, model_output_dir=non_auto_model_dir, start_params=zip_start_params)
 zip_train_pred = zip_result.predict(exog=X_train_const, exog_infl=X_train_const, which="mean")
 zip_val_pred = zip_result.predict(exog=X_val_const, exog_infl=X_val_const, which="mean")
 statsmodel_report("ZIP train", y_train, zip_train_pred, zip_result.aic)
@@ -73,7 +74,7 @@ statsmodel_report("ZIP val  ", y_val, zip_val_pred, zip_result.aic)
 print("=" * 80)
 print("Fitting Zero-Inflated Negative Binomial (ZINB) with feature-driven inflation")
 print("=" * 80)
-zinb_result = sm_zinb(X_train_const, y_train, start_params=zinb_start_params)
+zinb_result = sm_zinb(X_train_const, y_train, model_output_dir=non_auto_model_dir, start_params=zinb_start_params)
 zinb_train_pred = zinb_result.predict(exog=X_train_const, exog_infl=X_train_const, which="mean")
 zinb_val_pred = zinb_result.predict(exog=X_val_const, exog_infl=X_val_const, which="mean")
 statsmodel_report("ZINB train", y_train, zinb_train_pred, zinb_result.aic)
