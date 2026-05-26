@@ -23,13 +23,10 @@ Step 4: Standardize numeric variables and save to DuckDB
 """
 
 # Step 1: Apply cap and log1p transformations
-train = load_df(conn, "Auto_train_imputed", delete_id=False)
-test = load_df(conn, "Auto_test_imputed", delete_id=False)
-
-def log_cap_transform(conn, df):
-    target_col = ', call_counts' if "call_counts" in df.columns else ""
-    conn.register("input_df", df)
-    data = conn.execute(f"""
+for data in ["train", "test"]:
+    target_col = ', call_counts AS call_counts' if data == "train" else ""
+    conn.execute(f"""
+    CREATE OR REPLACE TABLE Auto_{data}_baseline AS
     WITH cte AS (
         SELECT
             id
@@ -41,7 +38,7 @@ def log_cap_transform(conn, df):
             , geo_group
             , has_prior_carrier
             , home_lot_sq_footage
-            , IF(household_group = '3autodwellingumb', 1, 0) AS _household_group
+            , IF(household_group = '2autodwelling', 1, 0) AS _household_group
             , LEAST(household_policy_counts, 4) AS _household_policy_counts
             , newest_veh_age
             , pol_edeliv_ind_filled
@@ -50,7 +47,7 @@ def log_cap_transform(conn, df):
             , telematics_ind
             , LOG(1 + LEAST(tenure_at_snapshot, 500)) AS _tenure_at_snapshot
             {target_col}
-        FROM input_df
+        FROM Auto_{data}_imputed
     )
     SELECT 
         id AS id
@@ -73,16 +70,14 @@ def log_cap_transform(conn, df):
         {target_col}
     FROM cte;
 
-    """).fetch_df()
-    conn.unregister("input_df")
-    return data
+    """)
 
-train_transformed = log_cap_transform(conn, train)
-test_transformed = log_cap_transform(conn, test)
+train = load_df(conn, "Auto_train_baseline", delete_id=False)
+test = load_df(conn, "Auto_test_baseline", delete_id=False)
 
 # Step 2: Split training data into train and validation sets
-X = train_transformed.drop(["call_counts"], axis=1)
-y = train_transformed[["id", "call_counts"]]
+X = train.drop(["call_counts"], axis=1)
+y = train[["id", "call_counts"]]
 
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -93,7 +88,7 @@ nominal_cat = ["acq_method", "bi_limit_group", "geo_group", "pol_edeliv_ind",
 
 X_train_encoded = pd.get_dummies(X_train, columns=nominal_cat, drop_first=True, dtype="int8")
 X_val_encoded = pd.get_dummies(X_val, columns=nominal_cat, drop_first=True, dtype="int8")
-test_encoded = pd.get_dummies(test_transformed, columns=nominal_cat, drop_first=True, dtype="int8")
+test_encoded = pd.get_dummies(test, columns=nominal_cat, drop_first=True, dtype="int8")
 
 X_val_encoded = X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
 test_encoded = test_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
