@@ -32,6 +32,66 @@ Below is the **plan**; implementation is still in progress.
   - Stage 2: on rows with Y > 0, predict E[Y | Y > 0], e.g. negative binomial or **boosting with NB loss** objective.  
   - Combined: ŷ = P(Y > 0) × E[Y | Y > 0].
 
+### Zero-inflated vs hurdle: how each approach treats zeros
+
+Both approaches address the same problem (lots of zeros + overdispersed positive counts), but they make **different assumptions about where the zeros come from**.
+
+#### Zero-inflated (ZIP / ZINB)
+
+A zero-inflated model is **two regressions fit jointly** on the same features X:
+
+1. **Inflation logit** — probability of being a structural zero ("never going to call"):
+
+$$
+\pi(X) = \mathrm{logit}^{-1}\!\Big(\beta^{\text{infl}}_0 + \sum_j \beta^{\text{infl}}_j X_j\Big)
+$$
+
+2. **Count regression** — conditional mean of the count process (Poisson for ZIP, NB for ZINB):
+
+$$
+\lambda(X) = \exp\!\Big(\beta^{\text{cnt}}_0 + \sum_j \beta^{\text{cnt}}_j X_j\Big)
+$$
+
+A zero in the data can come from **two sources**:
+
+$$
+P(Y=0 \mid X) \;=\; \underbrace{\pi(X)}_{\text{structural zero}} \;+\; \underbrace{(1-\pi(X))\cdot P_{\text{count}}(Y=0 \mid X)}_{\text{count zero (sampled 0)}}
+$$
+
+For $k > 0$:
+
+$$
+P(Y=k \mid X) \;=\; (1-\pi(X))\cdot P_{\text{count}}(Y=k \mid X)
+$$
+
+The count distribution is allowed to **also produce zeros**. ZIP/ZINB makes the most sense when the data contains genuinely two sub-populations: a "dormant" group that essentially never calls, and an "active" Poisson/NB group whose count occasionally lands on 0.
+
+#### Hurdle
+
+A hurdle model splits zeros and positives **cleanly**:
+
+1. **Stage 1 (binary)** — logistic regression on Y > 0. All zeros come from this stage only.
+2. **Stage 2 (zero-truncated count)** — fit on rows with Y > 0 only, using a count distribution that **cannot produce zeros**.
+
+$$
+P(Y=0 \mid X) \;=\; \pi(X)
+$$
+
+$$
+P(Y=k \mid X) \;=\; (1-\pi(X))\cdot \frac{P_{\text{count}}(k \mid X)}{1 - P_{\text{count}}(0 \mid X)}, \qquad k > 0
+$$
+
+The two stages are estimated **independently**, and stage 2 can be a different model family (e.g. logistic for stage 1, NB or boosted-NB for stage 2).
+
+#### Side-by-side
+
+| | ZIP / ZINB | Hurdle |
+|---|---|---|
+| Sources of zero | Two: structural + count-process zero | One: only the binary stage |
+| Count distribution | Can produce zeros | **Zero-truncated** (no zeros allowed) |
+| Estimation | Two parts fit jointly via MLE | Two parts fit independently |
+| Best fit when | Data is a mixture of "never callers" + an active count population | "Did the customer call at all?" is a different decision from "how many times?" |
+
 ## Experiment order (planned)
 1. Poisson GLM (reference baseline)
     https://www.statsmodels.org/dev/generated/statsmodels.genmod.generalized_linear_model.GLM.html
