@@ -32,6 +32,87 @@ Below is the **plan**; implementation is still in progress.
   - Stage 2: on rows with Y > 0, predict E[Y | Y > 0], e.g. negative binomial or **boosting with NB loss** objective.  
   - Combined: ŷ = P(Y > 0) × E[Y | Y > 0].
 
+### Count distributions: Poisson vs Negative Binomial
+
+All count models below plug one of these two distributions into the count part of the model. The difference between them is entirely about how much **variance** they allow for a given mean.
+
+#### Poisson
+
+A single-parameter count distribution with rate $\mu = \mathbb{E}[Y]$:
+
+$$
+P(Y = k \mid \mu) \;=\; \frac{e^{-\mu}\, \mu^{k}}{k!}, \qquad k = 0, 1, 2, \dots
+$$
+
+Key property: **variance equals mean** ($\mathrm{Var}(Y) = \mu$). This is restrictive — real-world count data is often more spread out than Poisson allows.
+
+In a regression, $\mu$ is linked to features through a log link:
+
+$$
+\mu(X) = \exp\!\Big(\beta_0 + \sum_j \beta_j X_j\Big)
+$$
+
+#### Negative Binomial
+
+The Negative Binomial distribution has two common parameterizations. They describe the **same family of distributions**, just from different angles.
+
+##### (a) Classical probability-theory form — "trials until $k$ successes"
+
+Counts the number of trials $X$ needed to see exactly $k$ successes, where each trial succeeds independently with probability $p$:
+
+$$
+P(X = x \mid k, p) \;=\; \frac{(x - 1)!}{(k - 1)!\,(x - k)!} \, p^{k} (1 - p)^{x - k}, \qquad x = k, k+1, k+2, \dots
+$$
+
+- $x$ = number of trials at which the $k$-th success occurs ($x \ge k$)
+- $p$ = probability of success on each trial
+- $k$ = (integer) number of successes you are waiting for
+- Mean: $\mu_X = k / p$
+- Standard deviation: $\sigma_X = \sqrt{k(1 - p)} / p$
+
+This is the form you usually see in a probability textbook (sometimes called the **Pascal** distribution). It generalizes the geometric distribution (which is the $k = 1$ case).
+
+##### (b) NB2 regression form — "count with mean $\mu$ and dispersion $\alpha$"
+
+The form used by statsmodels (and what fits naturally into GLM-style regression). Let $Y$ be the **count itself** (e.g. the number of failures before the $k$-th success, or just an integer outcome $\ge 0$):
+
+$$
+P(Y = y \mid \mu, \alpha) \;=\; \frac{\Gamma(y + 1/\alpha)}{\Gamma(1/\alpha)\, y!} \left(\frac{1/\alpha}{1/\alpha + \mu}\right)^{1/\alpha} \left(\frac{\mu}{1/\alpha + \mu}\right)^{y}, \qquad y = 0, 1, 2, \dots
+$$
+
+- Mean: $\mathbb{E}[Y] = \mu$
+- Variance: $\mathrm{Var}(Y) = \mu + \alpha\,\mu^{2}$ — strictly larger than the mean whenever $\alpha > 0$.
+- As $\alpha \to 0$, NB collapses back to Poisson.
+
+##### How the two forms relate
+
+They describe the same distribution, just shifted and reparameterized:
+
+- The classical form counts **trials** $X \ge k$. The NB2 form counts **failures** $Y = X - k \ge 0$.
+- The (k, p) and ($\mu$, $\alpha$) parameters are linked by
+
+$$
+\alpha = \frac{1}{k}, \qquad \mu = \frac{k(1 - p)}{p}, \qquad p = \frac{1}{1 + \alpha\,\mu}
+$$
+
+So the two forms differ in three practical ways:
+
+1. **Support.** Classical: $X \in \{k, k+1, \dots\}$. NB2: $Y \in \{0, 1, 2, \dots\}$ — required for a count regression where outcomes can be 0.
+2. **Parameters.** Classical uses $(k, p)$ — both interpretable as a "stopping rule" on Bernoulli trials, with $k$ an integer. NB2 uses $(\mu, \alpha)$ — directly the **mean** and a **dispersion** knob, with $1/\alpha$ allowed to be any positive real (continuous).
+3. **Use case.** Classical is convenient when the problem really is "trials until $k$ successes". NB2 is convenient for regression: $\mu$ is connected to features via a log link ($\mu(X) = \exp(\beta_0 + \sum_j \beta_j X_j)$), and $\alpha$ captures overdispersion in a single coefficient that can be tested and interpreted.
+
+In this project, only the NB2 form is used — it lets the model learn how $\mu$ varies with policyholder features while a single dispersion $\alpha$ absorbs the extra variance Poisson can't handle.
+
+#### Side-by-side
+
+| | Poisson | Negative Binomial |
+|---|---|---|
+| Parameters | $\mu$ | $\mu,\ \alpha$ |
+| Mean | $\mu$ | $\mu$ |
+| Variance | $\mu$ | $\mu + \alpha \mu^{2}$ |
+| Handles overdispersion | No | Yes |
+| Used as $P_{\text{count}}$ in | Poisson GLM, ZIP, hurdle stage 2 (Poisson) | NB regression, ZINB, hurdle stage 2 (NB / boosted-NB) |
+
 ### Zero-inflated vs hurdle: how each approach treats zeros
 
 Both approaches address the same problem (lots of zeros + overdispersed positive counts), but they make **different assumptions about where the zeros come from**.
@@ -100,14 +181,35 @@ The two stages are estimated **independently**, and stage 2 can be a different m
     https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedPoisson.html
 
 3. Zero-inflated negative binomial (ZINB)  
-    Statistical ZINB regression: https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedNegativeBinomialP.html
-    Bayesian ZINB modeling: https://www.pymc.io/projects/docs/en/stable/api/distributions/generated/pymc.ZeroInflatedNegativeBinomial.html
+    https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedNegativeBinomialP.html
 
 4. Hurdle: binary + negative binomial  
     statsmodels negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.discrete_model.NegativeBinomial.html
 
 5. Hurdle: binary + boosting (with NB loss)
     xgboost negative-binomial: https://xgboost-distribution.readthedocs.io/en/latest/api/xgboost_distribution.XGBDistribution.html
+
+### Bayesian alternative with PyMC (not demonstrated here)
+
+All of the count models above can also be fit in a Bayesian framework with PyMC. This project sticks with the frequentist statsmodels implementations, but PyMC offers ready-made distributions for each of the count models discussed:
+
+- Zero-inflated Poisson: https://www.pymc.io/projects/docs/en/stable/api/distributions/generated/pymc.ZeroInflatedPoisson.html
+- Zero-inflated negative binomial: https://www.pymc.io/projects/docs/en/stable/api/distributions/generated/pymc.ZeroInflatedNegativeBinomial.html
+- Hurdle negative binomial (bundles both hurdle stages into one likelihood): https://www.pymc.io/projects/docs/en/stable/api/distributions/generated/pymc.HurdleNegativeBinomial.html
+
+How the Bayesian (PyMC) approach differs from the frequentist (statsmodels) approach used here:
+
+| | Frequentist (statsmodels) | Bayesian (PyMC) |
+|---|---|---|
+| Estimation | Maximum likelihood (single point estimate of $\beta$) | MCMC sampling from the full posterior $p(\beta \mid \text{data})$ |
+| Priors | None (implicit flat prior) | Explicit (e.g. $\beta \sim \mathcal{N}(0, \sigma^2)$), gives built-in regularization |
+| Output | Point estimate, standard error, p-value (asymptotic) | Posterior samples, credible interval, full uncertainty over $\beta$ |
+| Inference | Based on large-sample asymptotics | Based on the exact posterior draws |
+| Model comparison | AIC / BIC / likelihood ratio | WAIC / LOO / posterior predictive checks |
+| Convergence check | Deterministic optimizer (converged or not) | MCMC diagnostics ($\hat R$, ESS, divergences) |
+| Compute cost | Fast (seconds–minutes) | Much slower (minutes–hours) due to MCMC |
+
+In short: the model **structure** (the same ZIP/ZINB/hurdle PMFs and link functions) is identical between the two approaches. The difference is how parameters are estimated and how uncertainty is reported.
 
 ## Metrics (planned)
 
