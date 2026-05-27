@@ -185,8 +185,17 @@ def callback(feature_names):
 #----------------------------------------------------------------------------#
 
 """
-- Binary logistic regression with a callback function for monitoring the optimization process
-- Make sure X has a intercept/constant variable!
+- Binary logistic regression with optional warm-start scaling trick.
+- When is_scaled=True (default) X is assumed to already be on a well-conditioned
+  scale (e.g. StandardScaler applied in data prep) and the model is fit directly.
+- When is_scaled=False X is on its original scale; the function:
+    1. Builds a scaler that rescales only continuous numeric columns (binary 0/1
+       columns, the intercept, and constant columns are kept as-is so their
+       coefficients are not distorted).
+    2. Fast-fits on the rescaled X for quick convergence.
+    3. Refits on the original X using the rescaled params as warm-start so the
+       final coefficients are on the original feature scale.
+- Make sure X has an intercept/constant variable!
 - e.g. if X is divided into X_train and X_test
 - X_train = sm.add_constant(X_train)
 - X_test = sm.add_constant(X_test)
@@ -194,33 +203,60 @@ def callback(feature_names):
 - X = sm.add_constant(X)
 """
 
-def sm_logit(X, y, model_output_dir, method="ncg", verbose=True):
+def sm_logit(X, y, model_output_dir, method="ncg", is_scaled=True, verbose=True):
+    if verbose:
+        print("Fitting Binary Logistic Regression (Logit)...")
+        start_time = time.perf_counter()
+
     X = sm.add_constant(X, has_constant="skip")
 
-    # Define the logit model
-    logit = sm.Logit(y, X)
+    if is_scaled:
+        # X is already on a well-conditioned scale -- fit directly.
+        logit = sm.Logit(y, X)
+        feature_names = logit.exog_names
+        callback_func = callback(feature_names)
+        model = logit.fit(method=method,
+                          disp=True,
+                          tol=1e-8,
+                          maxiter=1000,
+                          callback=callback_func)
+    else:
+        # X is on its original scale -- apply the warm-start scaling trick.
+        # Skip binary (0/1) columns, the intercept (all 1s), and constant cols
+        # so their coefficients are not distorted.
+        scaler = X.std(axis=0).astype(float)
+        is_binary = ((X == 0) | (X == 1)).all(axis=0)
+        scaler[is_binary] = 1.0
+        scaler[scaler == 0] = 1.0
+        X_s = X.div(scaler, axis="columns")
 
-    # Extract feature names
-    feature_names = logit.exog_names
-    callback_func = callback(feature_names)
-    
-    # Fit the model with the generalizable callback
-    model = logit.fit(method=method,
-                      disp=True,  # To display optimization messages
-                      maxiter=1000,
-                      callback=callback_func)
-    
+        # Step 1: fast fit on rescaled X
+        logit_s = sm.Logit(y, X_s)
+        feature_names = logit_s.exog_names
+        callback_func = callback(feature_names)
+        fast = logit_s.fit(method=method,
+                           disp=True,
+                           tol=1e-8,
+                           maxiter=1000,
+                           callback=callback_func)
+
+        # Step 2: refit on original X using rescaled params as warm-start
+        start_params = (fast.params / scaler).to_numpy()
+        logit = sm.Logit(y, X)
+        model = logit.fit(method=method,
+                          disp=True,
+                          tol=1e-8,
+                          start_params=start_params,
+                          maxiter=1000)
+
     if verbose:
-        # Display final model parameters
-        print("\nModel final parameters:")
-        print(model.params)
+        duration = time.perf_counter() - start_time
+        print(f"Model fitting time: {duration:.2f} seconds\n")
+        print(model.summary())
         print("\nModel fitting p-values:")
         print(model.pvalues)
         save_model_summary(model, model_output_dir, "logit_model_summary.txt")
-    
-    # # Optionally remove unnecessary data to reduce memory usage
-    # model.remove_data()
-    
+
     return model
 
 #----------------------------------------------------------------------------#
@@ -268,67 +304,6 @@ def constrained_sm_logit(X, y, logit_result, thresh, model_output_dir, verbose=T
 
     return model
 
-
-#----------------------------------------------------------------------------#
-#             Binary Logistic Regression with with Scaling Trick             #
-#----------------------------------------------------------------------------#
-
-
-def sm_logit_scale(X, y, model_output_dir, method="ncg", verbose=True):
-    """
-    Fit a binary logistic regression model with scaling.
-
-    Parameters:
-        X (pd.DataFrame): Feature matrix.
-        y (pd.Series or np.array): Binary target variable.
-        method (str): Optimization method for fitting the model.
-        verbose (bool): If True, prints progress and model summary.
-
-    Returns:
-        modelobj: Fitted binary logistic regression model.
-    """
-    if verbose:
-        print("Fitting Binary Logistic Regression (Logit)...")
-        start_time = time.perf_counter()
-
-    X = sm.add_constant(X, has_constant="skip")
-
-    # Step 1: Fit a scaled version -- much faster
-    scaler = X.std(axis=0)
-    scaler.iloc[0] = 1.0  # Prevent scaling of the intercept if present
-    X_s = X.div(scaler, axis='columns')
-    
-    logit = sm.Logit(y, X_s)
-
-    # Extract feature names
-    feature_names = logit.exog_names
-    callback_func = callback(feature_names)
-
-    modelobj = logit.fit(method=method,
-                         tol=1e-8,
-                         maxiter=1000,
-                         callback=callback_func)
-    start_params = modelobj.params.div(scaler, axis=0).T.to_numpy()
-
-    # Step 2: Fit using the original data
-    logit = sm.Logit(y, X)
-    modelobj = logit.fit(method=method,
-                         tol=1e-8,
-                         start_params=start_params,
-                         maxiter=1000)
-
-    if verbose:
-        duration = time.perf_counter() - start_time
-        print(f"Model fitting time: {duration:.2f} seconds")
-
-        # Print model summary
-        print(modelobj.summary())
-        # Print p-values
-        print("\nModel fitting p-values:")
-        print(modelobj.pvalues)
-        save_model_summary(modelobj, model_output_dir, "logit_scale_model_summary.txt")
-
-    return modelobj
 
 #----------------------------------------------------------------------------#
 #         Stepwise Feature Selection for Logistic Regression                 #
