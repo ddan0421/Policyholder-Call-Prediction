@@ -24,8 +24,7 @@ Step 1: Apply cap and log1p transformations and build hurdle data layout
     - test sets stay unfiltered so both stage models can score every test row
 
 Step 2: Stage 1 - Logistic Regression data prep (binary classification)
-    Split train/val, one-hot encode (drop_first=True), save.
-    No manual standardization - sm_logit applies scaling internally.
+    Split train/val, one-hot encode (drop_first=True), standardize numerics, save.
 
 Step 3: Stage 2 - Negative Binomial data prep (count regression)
     Split train/val, one-hot encode (drop_first=True), standardize numerics, save.
@@ -121,6 +120,14 @@ test_encoded = pd.get_dummies(test_binary, columns=nominal_cat, drop_first=True,
 
 X_val_encoded = X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
 test_encoded = test_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
+
+numeric_cols = ["12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
+                "household_policy_counts", "newest_veh_age", "tenure_at_snapshot"]
+
+scaler = StandardScaler()
+X_train_encoded[numeric_cols] = scaler.fit_transform(X_train_encoded[numeric_cols])
+X_val_encoded[numeric_cols] = scaler.transform(X_val_encoded[numeric_cols])
+test_encoded[numeric_cols] = scaler.transform(test_encoded[numeric_cols])
 
 tables = {
     "X_train_auto_binary": X_train_encoded,
