@@ -59,6 +59,35 @@ def sm_poisson_glm(X, y, model_output_dir, verbose=True):
 
 
 #----------------------------------------------------------------------------#
+#                       Negative Binomial Regression                         #
+#----------------------------------------------------------------------------#
+
+"""
+- Negative Binomial regression with log link, NB2 parameterization
+  (variance = mu + alpha * mu^2). alpha is estimated jointly with beta by MLE.
+- Useful for two contexts:
+    * As a stand-alone count regression when data is overdispersed.
+    * As the count side of a hurdle model: fit on rows where y > 0 only,
+      then take the predicted mu(X) as E[Y | Y > 0]. (Slight zero-truncation
+      misspecification; predictions are virtually identical to a true
+      zero-truncated NB in practice.)
+- Make sure X has an intercept/constant variable!
+"""
+
+def sm_nb(X, y, model_output_dir, method="bfgs", maxiter=2000, verbose=True):
+    X = sm.add_constant(X, has_constant="skip")
+
+    nb_model = sm.NegativeBinomial(y, X)
+    model = nb_model.fit(method=method, maxiter=maxiter, disp=False)
+
+    if verbose:
+        print(model.summary())
+        save_model_summary(model, model_output_dir, "nb_model_summary.txt")
+
+    return model
+
+
+#----------------------------------------------------------------------------#
 #               Warm-start helper for Zero-Inflated Models                   #
 #----------------------------------------------------------------------------#
 
