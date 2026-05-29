@@ -111,7 +111,7 @@ In this project, only the NB2 form is used — it lets the model learn how μ va
 | Mean | μ | μ |
 | Variance | μ | μ + α μ² |
 | Handles overdispersion | No | Yes |
-| Used as P_count in | Poisson GLM, ZIP, hurdle stage 2 (Poisson) | NB regression, ZINB, hurdle stage 2 (NB / boosted-NB) |
+| Used as P_count in | Poisson GLM, ZIP, hurdle stage 2 (Poisson) | NB regression, ZINB, hurdle stage 2 (zero-truncated NB / boosted-NB) |
 
 ### Zero-inflated vs hurdle: how each approach treats zeros
 
@@ -185,8 +185,8 @@ The two stages are estimated **independently**, and stage 2 can be a different m
 3. Zero-inflated negative binomial (ZINB)  
     https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedNegativeBinomialP.html
 
-4. Hurdle: binary + negative binomial  
-    statsmodels negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.discrete_model.NegativeBinomial.html
+4. Hurdle: binary + zero-truncated negative binomial  
+    statsmodels zero-truncated negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.truncated_model.TruncatedLFNegativeBinomialP.html
 
 5. Hurdle: binary + boosting (with NB loss)
     xgboost negative-binomial: https://xgboost-distribution.readthedocs.io/en/latest/api/xgboost_distribution.XGBDistribution.html

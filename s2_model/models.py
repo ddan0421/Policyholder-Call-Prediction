@@ -3,6 +3,7 @@ import statsmodels.api as sm
 import pandas as pd
 import numpy as np
 from scipy.optimize import LinearConstraint, minimize
+from statsmodels.discrete.truncated_model import TruncatedLFNegativeBinomialP
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from warnings import filterwarnings
 import time
@@ -65,12 +66,10 @@ def sm_poisson_glm(X, y, model_output_dir, verbose=True):
 """
 - Negative Binomial regression with log link, NB2 parameterization
   (variance = mu + alpha * mu^2). alpha is estimated jointly with beta by MLE.
-- Useful for two contexts:
-    * As a stand-alone count regression when data is overdispersed.
-    * As the count side of a hurdle model: fit on rows where y > 0 only,
-      then take the predicted mu(X) as E[Y | Y > 0]. (Slight zero-truncation
-      misspecification; predictions are virtually identical to a true
-      zero-truncated NB in practice.)
+- Useful as a stand-alone count regression when data is overdispersed.
+- For the count side of a hurdle model (fit on rows where y > 0 only) use
+  sm_truncated_nb instead -- its likelihood explicitly excludes zero so the
+  predicted mean is exactly E[Y | Y > 0, X].
 - Make sure X has an intercept/constant variable!
 """
 
@@ -83,6 +82,38 @@ def sm_nb(X, y, model_output_dir, method="bfgs", maxiter=2000, verbose=True):
     if verbose:
         print(model.summary())
         save_model_summary(model, model_output_dir, "nb_model_summary.txt")
+
+    return model
+
+
+#----------------------------------------------------------------------------#
+#                Zero-Truncated Negative Binomial Regression                 #
+#----------------------------------------------------------------------------#
+
+"""
+- Zero-truncated NB2 regression for hurdle stage 2: models the conditional
+  distribution Y | Y > 0 with a likelihood that explicitly excludes zero.
+- Fit on rows where y > 0 only.
+- model.predict(X) returns the truncated mean directly:
+      E[Y | Y > 0, X] = mu(X) / (1 - P_NB(0 | mu(X), alpha))
+  so it can be plugged straight into the hurdle product
+      y_hat = P(Y > 0 | X) * E[Y | Y > 0, X]
+  without any manual truncation correction.
+- alpha is estimated jointly with beta by MLE; p=2 is the NB2 parameterization
+  (variance = mu + alpha * mu^2).
+- Make sure X has an intercept/constant variable!
+- Reference: https://www.statsmodels.org/stable/generated/statsmodels.discrete.truncated_model.TruncatedLFNegativeBinomialP.html
+"""
+
+def sm_truncated_nb(X, y, model_output_dir, p=2, method="bfgs", maxiter=2000, verbose=True):
+    X = sm.add_constant(X, has_constant="skip")
+
+    truncated_nb_model = TruncatedLFNegativeBinomialP(y, X, p=p)
+    model = truncated_nb_model.fit(method=method, maxiter=maxiter, disp=False)
+
+    if verbose:
+        print(model.summary())
+        save_model_summary(model, model_output_dir, "truncated_nb_model_summary.txt")
 
     return model
 
