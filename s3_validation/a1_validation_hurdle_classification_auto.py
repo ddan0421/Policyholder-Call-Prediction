@@ -26,10 +26,10 @@ lr_model = load_pkl(os.path.join(auto_model_dir, "lr_model_auto.pkl"))
 
 
 # Step 1: Score the train and val splits with the saved Logit model.
-# Loaded with delete_id=False so we can attach the model id to predictions
+# Loaded with id kept (no exclude_cols) so we can attach the model id to predictions
 # and join back to original-scale features in DuckDB.
-X_train = load_df(conn, "X_train_auto_binary", delete_id=False)
-X_val = load_df(conn, "X_val_auto_binary", delete_id=False)
+X_train = load_df(conn, "X_train_auto_binary")
+X_val = load_df(conn, "X_val_auto_binary")
 
 X_train_const = sm.add_constant(X_train.drop(columns=["id"]), has_constant="add")
 X_val_const = sm.add_constant(X_val.drop(columns=["id"]), has_constant="add")
