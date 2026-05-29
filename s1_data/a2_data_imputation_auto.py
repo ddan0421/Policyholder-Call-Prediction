@@ -40,8 +40,8 @@ for source in ["train", "test"]:
     conn.execute(auto_query)
 
 # Step 2: Hold out validation split (full rows, including call_counts)
-train = load_df(conn, "Auto_train", delete_id=False)
-test = load_df(conn, "Auto_test", delete_id=False)
+train = load_df(conn, "Auto_train")
+test = load_df(conn, "Auto_test")
 
 train_split, val_split = train_test_split(train, test_size=0.2, random_state=42)
 

@@ -1,4 +1,13 @@
-def save_df(conn, df, table_name, add_id=True):
+import duckdb
+import pandas as pd
+
+
+def save_df(
+    conn: duckdb.DuckDBPyConnection,
+    df: pd.DataFrame,
+    table_name: str,
+    add_id: bool = True,
+) -> None:
     temp_name = f"tmp_{table_name}"
 
     df_copy = df.copy()
@@ -14,10 +23,16 @@ def save_df(conn, df, table_name, add_id=True):
 
     conn.unregister(temp_name)
 
-def load_df(conn, table_name, delete_id=True):
-    exclude_id = "EXCLUDE (Id)" if delete_id else ""
+
+def load_df(
+    conn: duckdb.DuckDBPyConnection,
+    table_name: str,
+    exclude_cols: list[str] | None = None,
+) -> pd.DataFrame:
+    exclude_clause = f"EXCLUDE ({', '.join(exclude_cols)})" if exclude_cols else ""
+
     query = f"""
-        SELECT * {exclude_id}
+        SELECT * {exclude_clause}
         FROM {table_name}
         ORDER BY Id;
     """

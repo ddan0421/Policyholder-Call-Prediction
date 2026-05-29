@@ -69,8 +69,8 @@ for data in ["train", "test"]:
     FROM cte;
     """)
 
-train = load_df(conn, "NonAuto_train_baseline", delete_id=False)
-test = load_df(conn, "NonAuto_test_baseline", delete_id=False)
+train = load_df(conn, "NonAuto_train_baseline")
+test = load_df(conn, "NonAuto_test_baseline")
 
 # Step 2: Split training data into train and validation sets
 X = train.drop(["call_counts"], axis=1)

@@ -30,10 +30,10 @@ database_path = os.path.join(base_folder, database)
 conn = duckdb.connect(database=database_path, read_only=True)
 
 # Step 1: Load model-ready tables built in s1_data/a5_modeldat_hurdle_auto.py
-X_train = load_df(conn, "X_train_auto_binary", delete_id=True)
-X_val = load_df(conn, "X_val_auto_binary", delete_id=True)
-y_train = load_df(conn, "y_train_auto_binary", delete_id=True)["nonzero_call"].to_numpy()
-y_val = load_df(conn, "y_val_auto_binary", delete_id=True)["nonzero_call"].to_numpy()
+X_train = load_df(conn, "X_train_auto_binary", exclude_cols=["id"])
+X_val = load_df(conn, "X_val_auto_binary", exclude_cols=["id"])
+y_train = load_df(conn, "y_train_auto_binary", exclude_cols=["id"])["nonzero_call"].to_numpy()
+y_val = load_df(conn, "y_val_auto_binary", exclude_cols=["id"])["nonzero_call"].to_numpy()
 
 
 

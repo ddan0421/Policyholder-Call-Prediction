@@ -27,10 +27,10 @@ database_path = os.path.join(base_folder, database)
 conn = duckdb.connect(database=database_path, read_only=True)
 
 # Step 1: Load model-ready tables built in s1_data/a4_baseline_modeldat_nonauto.py
-X_train = load_df(conn, "X_train_nonauto_base", delete_id=True)
-X_val = load_df(conn, "X_val_nonauto_base", delete_id=True)
-y_train = load_df(conn, "y_train_nonauto", delete_id=True)["call_counts"].to_numpy()
-y_val = load_df(conn, "y_val_nonauto", delete_id=True)["call_counts"].to_numpy()
+X_train = load_df(conn, "X_train_nonauto_base", exclude_cols=["id"])
+X_val = load_df(conn, "X_val_nonauto_base", exclude_cols=["id"])
+y_train = load_df(conn, "y_train_nonauto", exclude_cols=["id"])["call_counts"].to_numpy()
+y_val = load_df(conn, "y_val_nonauto", exclude_cols=["id"])["call_counts"].to_numpy()
 
 conn.close()
 
