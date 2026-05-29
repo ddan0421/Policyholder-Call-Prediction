@@ -1,7 +1,8 @@
-import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+
+from s1_data.a0_setup_directories import auto_model_dir
 from s1_data.db_utils import load_df, save_df
+from s1_data.transform_utils import apply_transformer, fit_transformer, save_transformer
 
 import duckdb
 import os
@@ -100,34 +101,34 @@ for stage in ["binary", "count"]:
         """)
 
 
-#################### Step 2: Stage 1 - Logistic Regression Data Prep ####################
-train_binary = load_df(conn, "Auto_train_binary", delete_id=False)
-test_binary = load_df(conn, "Auto_test_binary", delete_id=False)
+nominal_cat = [
+    "acq_method", "bi_limit_group", "geo_group", "pol_edeliv_ind",
+    "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind",
+]
+numeric_cols = [
+    "12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
+    "household_policy_counts", "newest_veh_age", "tenure_at_snapshot",
+]
 
-# Split training data into train and validation sets
+#################### Step 2: Stage 1 - Logistic Regression Data Prep ####################
+train_binary = load_df(conn, "Auto_train_binary")
+test_binary = load_df(conn, "Auto_test_binary")
+
 X = train_binary.drop(["nonzero_call"], axis=1)
 y = train_binary[["id", "nonzero_call"]]
-
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-# One-hot encode nominal categorical variables
-binary_cat = ["digital_contact_ind", "has_prior_carrier", "household_group"]
-nominal_cat = ["acq_method", "bi_limit_group", "geo_group", "pol_edeliv_ind", 
-                "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind"]
 
-X_train_encoded = pd.get_dummies(X_train, columns=nominal_cat, drop_first=True, dtype="int8")
-X_val_encoded = pd.get_dummies(X_val, columns=nominal_cat, drop_first=True, dtype="int8")
-test_encoded = pd.get_dummies(test_binary, columns=nominal_cat, drop_first=True, dtype="int8")
+X_train_encoded, binary_transformer = fit_transformer(
+    X_train,
+    nominal_cat=nominal_cat,
+    drop_first=True,
+    numeric_cols=numeric_cols,
+    standardize=True,
+)
+X_val_encoded = apply_transformer(X_val, binary_transformer)
+test_encoded = apply_transformer(test_binary, binary_transformer)
 
-X_val_encoded = X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-test_encoded = test_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-
-numeric_cols = ["12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
-                "household_policy_counts", "newest_veh_age", "tenure_at_snapshot"]
-
-scaler = StandardScaler()
-X_train_encoded[numeric_cols] = scaler.fit_transform(X_train_encoded[numeric_cols])
-X_val_encoded[numeric_cols] = scaler.transform(X_val_encoded[numeric_cols])
-test_encoded[numeric_cols] = scaler.transform(test_encoded[numeric_cols])
+save_transformer(binary_transformer, os.path.join(auto_model_dir, "auto_binary_transformer.pkl"))
 
 tables = {
     "X_train_auto_binary": X_train_encoded,
@@ -145,33 +146,24 @@ print(conn.execute("SHOW TABLES").fetchall())
 print("Stage 1 Binary Classification Auto Dataset Prep is done.")
 
 #################### Step 3: Stage 2 - Negative Binomial Data Prep ####################
-train_count_nb = load_df(conn, "Auto_train_count", delete_id=False)
-test_count_nb = load_df(conn, "Auto_test_count", delete_id=False)
+train_count_nb = load_df(conn, "Auto_train_count")
+test_count_nb = load_df(conn, "Auto_test_count")
 
-# Split training data into train and validation sets
 X = train_count_nb.drop(["call_counts"], axis=1)
 y = train_count_nb[["id", "call_counts"]]
-
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-# One-hot encode nominal categorical variables
-binary_cat = ["digital_contact_ind", "has_prior_carrier", "household_group"]
-nominal_cat = ["acq_method", "bi_limit_group", "geo_group", "pol_edeliv_ind", 
-                "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind"]
 
-X_train_encoded = pd.get_dummies(X_train, columns=nominal_cat, drop_first=True, dtype="int8")
-X_val_encoded = pd.get_dummies(X_val, columns=nominal_cat, drop_first=True, dtype="int8")
-test_encoded = pd.get_dummies(test_count_nb, columns=nominal_cat, drop_first=True, dtype="int8")
+X_train_encoded, count_nb_transformer = fit_transformer(
+    X_train,
+    nominal_cat=nominal_cat,
+    drop_first=True,
+    numeric_cols=numeric_cols,
+    standardize=True,
+)
+X_val_encoded = apply_transformer(X_val, count_nb_transformer)
+test_encoded = apply_transformer(test_count_nb, count_nb_transformer)
 
-X_val_encoded = X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-test_encoded = test_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-
-numeric_cols = ["12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
-                "household_policy_counts", "newest_veh_age", "tenure_at_snapshot"]
-
-scaler = StandardScaler()
-X_train_encoded[numeric_cols] = scaler.fit_transform(X_train_encoded[numeric_cols])
-X_val_encoded[numeric_cols] = scaler.transform(X_val_encoded[numeric_cols])
-test_encoded[numeric_cols] = scaler.transform(test_encoded[numeric_cols])
+save_transformer(count_nb_transformer, os.path.join(auto_model_dir, "auto_count_nb_transformer.pkl"))
 
 tables = {
     "X_train_auto_count_nb": X_train_encoded,
@@ -194,25 +186,26 @@ print("Stage 2 Count Regression (NB) Auto Dataset Prep is done.")
 # NB block above (same train_test_split with random_state=42 -> identical
 # row positions). Run the NB block first.
 
-train_count_ml = load_df(conn, "Auto_train_count", delete_id=False)
-test_count_ml = load_df(conn, "Auto_test_count", delete_id=False)
+train_count_ml = load_df(conn, "Auto_train_count")
+test_count_ml = load_df(conn, "Auto_test_count")
 
-# Split training data into train and validation sets
 X = train_count_ml.drop(["call_counts"], axis=1)
 y = train_count_ml[["id", "call_counts"]]
-
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-# One-hot encode nominal categorical variables
-binary_cat = ["digital_contact_ind", "has_prior_carrier", "household_group"]
-nominal_cat = ["acq_method", "bi_limit_group", "geo_group", "pol_edeliv_ind", 
-                "prdct_sbtyp_grp", "product_sbtyp", "telematics_ind"]
 
-X_train_encoded = pd.get_dummies(X_train, columns=nominal_cat, drop_first=False, dtype="int8")
-X_val_encoded = pd.get_dummies(X_val, columns=nominal_cat, drop_first=False, dtype="int8")
-test_encoded = pd.get_dummies(test_count_ml, columns=nominal_cat, drop_first=False, dtype="int8")
+# ML stage: keep all dummy levels (drop_first=False) and skip standardization
+# since trees / boosters are scale-invariant.
+X_train_encoded, count_ml_transformer = fit_transformer(
+    X_train,
+    nominal_cat=nominal_cat,
+    drop_first=False,
+    numeric_cols=None,
+    standardize=False,
+)
+X_val_encoded = apply_transformer(X_val, count_ml_transformer)
+test_encoded = apply_transformer(test_count_ml, count_ml_transformer)
 
-X_val_encoded = X_val_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
-test_encoded = test_encoded.reindex(columns=X_train_encoded.columns, fill_value=0)
+save_transformer(count_ml_transformer, os.path.join(auto_model_dir, "auto_count_ml_transformer.pkl"))
 
 tables = {
     "X_train_auto_count_ml": X_train_encoded,
