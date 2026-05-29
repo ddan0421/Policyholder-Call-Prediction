@@ -16,11 +16,13 @@ from sklearn.metrics import roc_auc_score, log_loss
 warnings.filterwarnings("ignore")
 
 """
-Baseline count models for Non Auto segment (statsmodels):
-1. Poisson GLM (reference)
-2. Zero-Inflated Poisson (ZIP) with feature-driven inflation
-3. Zero-Inflated Negative Binomial (ZINB) with feature-driven inflation
+Hurdle stage 1 for Auto segment.
 
+Fit a logistic regression on (call_counts > 0) using the binary data prepared
+in s1_data/a5_modeldat_hurdle_auto.py. The fitted probability is used as
+P(Y > 0 | X). Combined with stage 2 from a2_models_hurdle_count_NB_auto.py:
+
+    y_hat(X) = P(Y > 0 | X) * E[Y | Y > 0, X]
 """
 
 base_folder = "data"
