@@ -73,21 +73,14 @@ y_val = y_val_meta["call_counts"].to_numpy()
 # The transformers were fit with `id` still in the input frame, so it ends up
 # in feature_columns. Drop it before scoring -- both models were trained with
 # id excluded (load_df(..., exclude_cols=["id"]) at training time).
-def transform_and_constant(df_raw, transformer, expected_columns):
+def transform_and_constant(df_raw, transformer):
     X = apply_transformer(df_raw, transformer)
     X = X.drop(columns=["id"])
-    X = sm.add_constant(X, has_constant="add")
-    # Reorder to exactly match the training column order so statsmodels'
-    # positional matrix-multiply lines up with the fitted params.
-    return X[expected_columns]
+    return sm.add_constant(X, has_constant="add")
 
 
-X_val_binary = transform_and_constant(
-    X_val_raw, binary_transformer, lr_model.model.exog_names
-)
-X_val_count = transform_and_constant(
-    X_val_raw, count_transformer, nb_model.model.exog_names
-)
+X_val_binary = transform_and_constant(X_val_raw, binary_transformer)
+X_val_count = transform_and_constant(X_val_raw, count_transformer)
 
 
 # Step 4: Stage 1 + Stage 2 predictions and the hurdle product.
