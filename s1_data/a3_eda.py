@@ -317,7 +317,15 @@ plt.close(fig)
 print(f"[saved] plots/{filename}")
 
 
-
+# =====================================================================
+# Section 4: Call rate, marginal mean, and conditional mean by predictor level
+#   05_ Auto    call_rate           (P(y > 0))
+#   06_ Auto    marginal_mean       (E[y], all rows)
+#   07_ Auto    conditional_mean    (E[y | y > 0])
+#   08_ NonAuto call_rate           (P(y > 0))
+#   09_ NonAuto marginal_mean       (E[y], all rows)
+#   10_ NonAuto conditional_mean    (E[y | y > 0])
+# =====================================================================
 
 def _sort_by_valvar(df):
     try:
@@ -361,10 +369,14 @@ def build_valid_table(conn, varlist):
         valid_table["SumGivenPositive"] / valid_table["ActualCnt"],
         np.nan,
     )
+    # Marginal E[Y] per bin: average of call_counts over ALL rows (zeros included).
+    # SumGivenPositive == SUM(call_counts) since rows with call_counts == 0
+    # contribute 0 to the IF-sum either way.
+    valid_table["MarginalMean"] = valid_table["SumGivenPositive"] / valid_table["TotalCnt"]
     return valid_table
 
 
-def plot_response_curves(valid_table, varlist, segment, prefix):
+def plot_call_rate_curves(valid_table, varlist, segment, prefix):
     """One PNG per variable: P(y > 0) line on left axis, counts as bars on right."""
     for var in varlist:
         sub = _sort_by_valvar(valid_table[valid_table["Variable"] == var])
@@ -394,7 +406,42 @@ def plot_response_curves(valid_table, varlist, segment, prefix):
 
         fig.suptitle(f"{var}: call rate by level ({segment} train)", y=1.02)
         plt.tight_layout()
-        filename = f"{prefix}response_curves_{segment.lower()}_{var}.png"
+        filename = f"{prefix}call_rate_{segment.lower()}_{var}.png"
+        fig.savefig(f"plots/{filename}", dpi=150, bbox_inches="tight")
+        plt.close(fig)
+        print(f"[saved] plots/{filename}")
+
+
+def plot_marginal_mean_curves(valid_table, varlist, segment, prefix):
+    """Marginal view: E[Y] (average call_counts including zeros) per bin."""
+    for var in varlist:
+        sub = _sort_by_valvar(valid_table[valid_table["Variable"] == var])
+        if sub.empty:
+            print(f"[skip] {segment} {var}: no rows in validTable")
+            continue
+
+        x = np.arange(len(sub))
+        labels = sub["ValVar"].astype(str)
+
+        fig, ax1 = plt.subplots(figsize=(12, 5))
+        ax1.plot(x, sub["MarginalMean"], color="#C44E52", marker="o", linewidth=2,
+                 label="E[y]")
+        ax1.set_xlabel(var)
+        ax1.set_ylabel("Marginal mean call_counts")
+        ax1.set_xticks(x)
+        ax1.set_xticklabels(labels, rotation=45, ha="right")
+
+        ax2 = ax1.twinx()
+        ax2.bar(x, sub["TotalCnt"], color="#4C72B0", alpha=0.4, label="Total count")
+        ax2.set_ylabel("Count")
+
+        lines1, labels1 = ax1.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
+
+        fig.suptitle(f"{var}: marginal mean call_counts by level ({segment} train)", y=1.02)
+        plt.tight_layout()
+        filename = f"{prefix}marginal_mean_{segment.lower()}_{var}.png"
         fig.savefig(f"plots/{filename}", dpi=150, bbox_inches="tight")
         plt.close(fig)
         print(f"[saved] plots/{filename}")
@@ -427,7 +474,7 @@ def plot_conditional_mean_curves(valid_table, varlist, segment, prefix):
         lines2, labels2 = ax2.get_legend_handles_labels()
         ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
-        fig.suptitle(f"{var}: mean calls given y > 0 ({segment} train)", y=1.02)
+        fig.suptitle(f"{var}: conditional mean call_counts given y > 0 ({segment} train)", y=1.02)
         plt.tight_layout()
         filename = f"{prefix}conditional_mean_{segment.lower()}_{var}.png"
         fig.savefig(f"plots/{filename}", dpi=150, bbox_inches="tight")
@@ -435,15 +482,7 @@ def plot_conditional_mean_curves(valid_table, varlist, segment, prefix):
         print(f"[saved] plots/{filename}")
 
 
-# =====================================================================
-# Section 4: Response curves and conditional means by predictor level
-#   05_ Auto    response curves    (P(y > 0))
-#   06_ Auto    conditional means  (E[y | y > 0])
-#   07_ NonAuto response curves    (P(y > 0))
-#   08_ NonAuto conditional means  (E[y | y > 0])
-# =====================================================================
-
-# Auto: build validdat with Auto-specific bins/caps, then plot response curves
+# Auto: build validdat with Auto-specific bins/caps, then plot call rate / mean curves
 auto_varlist = [
     "binned_12m_call_history", "acq_method", "binned_ann_prm_amt", "bi_limit_group",
     "digital_contact_ind", "geo_group", "has_prior_carrier", "binned_home_lot_sq_footage",
@@ -476,12 +515,13 @@ conn.execute("""
         FROM Auto_train_imputed;
 """)
 auto_valid_table = build_valid_table(conn, auto_varlist)
-plot_response_curves(auto_valid_table, auto_varlist, "Auto", "05_")
-plot_conditional_mean_curves(auto_valid_table, auto_varlist, "Auto", "06_")
+plot_call_rate_curves(auto_valid_table, auto_varlist, "Auto", "05_")
+plot_marginal_mean_curves(auto_valid_table, auto_varlist, "Auto", "06_")
+plot_conditional_mean_curves(auto_valid_table, auto_varlist, "Auto", "07_")
 
 
 
-# NonAuto: build validdat with NonAuto-specific bins/caps, then plot response curves
+# NonAuto: build validdat with NonAuto-specific bins/caps, then plot call rate / mean curves
 nonauto_varlist = [
     "binned_12m_call_history", "acq_method", "binned_ann_prm_amt",
     "digital_contact_ind", "geo_group", "has_prior_carrier", "binned_home_lot_sq_footage",
@@ -512,13 +552,14 @@ conn.execute("""
         FROM NonAuto_train_imputed;
 """)
 nonauto_valid_table = build_valid_table(conn, nonauto_varlist)
-plot_response_curves(nonauto_valid_table, nonauto_varlist, "NonAuto", "07_")
-plot_conditional_mean_curves(nonauto_valid_table, nonauto_varlist, "NonAuto", "08_")
+plot_call_rate_curves(nonauto_valid_table, nonauto_varlist, "NonAuto", "08_")
+plot_marginal_mean_curves(nonauto_valid_table, nonauto_varlist, "NonAuto", "09_")
+plot_conditional_mean_curves(nonauto_valid_table, nonauto_varlist, "NonAuto", "10_")
 
 
 
 # =====================================================================
-# Section 5: Cap + log1p transform comparison (09_)
+# Section 5: Cap + log1p transform comparison (11_)
 #   raw vs log1p(min(x, cap)) using vertical boxplots, Auto vs NonAuto
 #   Caps match the binning thresholds applied per segment above.
 # =====================================================================
@@ -567,7 +608,7 @@ for col, caps in log_caps.items():
     axes[1].set_ylabel(f"log1p(min({col}, cap))")
 
     plt.tight_layout()
-    filename = f"09_box_whisker_{col.replace(' ', '_')}_raw_vs_capped_log1p.png"
+    filename = f"11_box_whisker_{col.replace(' ', '_')}_raw_vs_capped_log1p.png"
     fig.savefig(f"plots/{filename}", dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"[saved] plots/{filename}")
