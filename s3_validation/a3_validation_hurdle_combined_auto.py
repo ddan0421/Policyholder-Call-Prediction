@@ -1,14 +1,33 @@
 import os
 import pickle
+import warnings
 
 import duckdb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+from sklearn.model_selection import train_test_split
 
 from s1_data.a0_setup_directories import auto_model_dir
 from s1_data.db_utils import load_df
+from s1_data.transform_utils import apply_transformer, load_transformer
+
+warnings.filterwarnings("ignore")
+
+"""
+Combined hurdle calibration for Auto segment.
+
+Same recipe as s2_model/a4_models_hurdle_combined_auto.py, but here we keep
+both Train and Val splits and aggregate by predictor level so we can plot
+actual vs predicted marginal mean E[Y] (zeros included). This mirrors the
+EDA `plot_marginal_mean_curves` view (06_marginal_mean_*) but overlays the
+hurdle product:
+
+    y_hat(X) = P(Y > 0 | X) * E[Y | Y > 0, X]
+
+Saved as 14_actual_vs_pred_marginal_*.
+"""
 
 base_folder = "data"
 database = "TravelersPolicyHolderCall.duckdb"
@@ -23,34 +42,61 @@ def load_pkl(path):
 
 
 lr_model = load_pkl(os.path.join(auto_model_dir, "lr_model_auto.pkl"))
+nb_model = load_pkl(os.path.join(auto_model_dir, "nb_model_auto.pkl"))
+
+binary_transformer = load_transformer(
+    os.path.join(auto_model_dir, "auto_binary_transformer.pkl")
+)
+count_transformer = load_transformer(
+    os.path.join(auto_model_dir, "auto_count_nb_transformer.pkl")
+)
 
 
-# Step 1: Score the train and val splits with the saved Logit model.
-# Loaded with id kept (no exclude_cols) so we can attach the model id to predictions
-# and join back to original-scale features in DuckDB.
-X_train = load_df(conn, "X_train_auto_binary")
-X_val = load_df(conn, "X_val_auto_binary")
+# Step 1: Recover both Train and Val rows with the same split used at training
+# time (random_state=42, test_size=0.2). Auto_train_binary supplies the cap +
+# log1p transformed features for both stages; the actual call_counts are read
+# later from Auto_train_imputed via the SQL JOIN.
+X_raw = load_df(conn, "Auto_train_binary", exclude_cols=["nonzero_call"])
+y_raw = load_df(conn, "Auto_train_imputed")[["id", "call_counts"]]
 
-X_train_const = sm.add_constant(X_train.drop(columns=["id"]), has_constant="add")
-X_val_const = sm.add_constant(X_val.drop(columns=["id"]), has_constant="add")
-
-lr_train_pred = lr_model.predict(X_train_const)
-lr_val_pred = lr_model.predict(X_val_const)
+X_train_raw, X_val_raw, _, _ = train_test_split(
+    X_raw, y_raw, test_size=0.2, random_state=42
+)
 
 
-# Step 2: Build a (id, pred, Sample) table for join. We only keep what we need;
+# Step 2: Apply each stage's transformer separately (each was standardized
+# against a different sample, so their fitted means/SDs differ), then form the
+# hurdle product y_hat = P(Y > 0) * E[Y | Y > 0].
+def transform_and_constant(df_raw, transformer):
+    X = apply_transformer(df_raw, transformer)
+    X = X.drop(columns=["id"])
+    return sm.add_constant(X, has_constant="add")
+
+
+def hurdle_predict(df_raw):
+    X_binary = transform_and_constant(df_raw, binary_transformer)
+    X_count = transform_and_constant(df_raw, count_transformer)
+    prob_y_gt_0 = np.asarray(lr_model.predict(X_binary))
+    mu_y_given_pos = np.asarray(nb_model.predict(X_count))
+    return prob_y_gt_0 * mu_y_given_pos
+
+
+train_pred = hurdle_predict(X_train_raw)
+val_pred = hurdle_predict(X_val_raw)
+
+
+# Step 3: Build a (id, pred, Sample) table for join. We only keep what we need;
 # the original features are read from Auto_train_imputed inside the SQL below.
-lr_pred = pd.concat(
+hurdle_pred = pd.concat(
     [
-        pd.DataFrame({"id": X_train["id"].to_numpy(), "pred": lr_train_pred.to_numpy(), "Sample": "Train"}),
-        pd.DataFrame({"id": X_val["id"].to_numpy(),   "pred": lr_val_pred.to_numpy(),   "Sample": "Val"}),
+        pd.DataFrame({"id": X_train_raw["id"].to_numpy(), "pred": train_pred, "Sample": "Train"}),
+        pd.DataFrame({"id": X_val_raw["id"].to_numpy(),   "pred": val_pred,   "Sample": "Val"}),
     ],
     axis=0,
     ignore_index=True,
 )
 
-# Register so DuckDB can JOIN against it (avoids relying on replacement scans).
-conn.register("lr_pred", lr_pred)
+conn.register("hurdle_pred", hurdle_pred)
 
 
 def _sort_by_valvar(df):
@@ -64,16 +110,15 @@ def _sort_by_valvar(df):
 
 
 def build_valid_table(conn, varlist):
-    """Aggregate actual and predicted P(y > 0) per (variable, level, sample)."""
+    """Aggregate actual and predicted marginal mean E[Y] per (variable, level, sample)."""
     conn.execute("""
         CREATE OR REPLACE TEMP TABLE validTable (
-            Variable        VARCHAR,
-            ValVar          VARCHAR,
-            Sample          VARCHAR,
-            PredCnt         DOUBLE,
-            ActualCnt       INT,
-            TotalCnt        INT,
-            SumGivenPositive DOUBLE
+            Variable    VARCHAR,
+            ValVar      VARCHAR,
+            Sample      VARCHAR,
+            PredMean    DOUBLE,
+            ActualMean  DOUBLE,
+            TotalCnt    INT
         );
     """)
     for var in varlist:
@@ -83,29 +128,20 @@ def build_valid_table(conn, varlist):
                     '{var}' AS Variable,
                     {var}::VARCHAR AS ValVar,
                     Sample,
-                    SUM(pred) AS PredCnt,
-                    SUM(IF(call_counts > 0, 1, 0)) AS ActualCnt,
-                    COUNT(*) AS TotalCnt,
-                    SUM(IF(call_counts > 0, call_counts, 0)) AS SumGivenPositive
+                    AVG(pred) AS PredMean,
+                    AVG(call_counts) AS ActualMean,
+                    COUNT(*) AS TotalCnt
                 FROM validdat
                 GROUP BY 1, 2, 3
                 ORDER BY 1, 2, 3
         """)
-    valid_table = conn.execute(
+    return conn.execute(
         "SELECT * FROM validTable ORDER BY Variable, Sample, ValVar;"
     ).fetch_df()
-    valid_table["ActualRate"] = valid_table["ActualCnt"] / valid_table["TotalCnt"]
-    valid_table["PredRate"] = valid_table["PredCnt"] / valid_table["TotalCnt"]
-    valid_table["MeanGivenPositive"] = np.where(
-        valid_table["ActualCnt"] > 0,
-        valid_table["SumGivenPositive"] / valid_table["ActualCnt"],
-        np.nan,
-    )
-    return valid_table
 
 
 def plot_actual_vs_pred(valid_table, varlist, segment, prefix):
-    """One PNG per (variable, sample): overlay actual vs predicted P(y > 0)."""
+    """One PNG per (variable, sample): overlay actual vs predicted marginal mean E[Y]."""
     os.makedirs("plots", exist_ok=True)
     samples = sorted(valid_table["Sample"].dropna().unique())
     for var in varlist:
@@ -124,14 +160,12 @@ def plot_actual_vs_pred(valid_table, varlist, segment, prefix):
             labels = sub["ValVar"].astype(str)
 
             fig, ax1 = plt.subplots(figsize=(12, 5))
-            ax1.plot(x, sub["ActualRate"], color="#C44E52", marker="o", linewidth=2,
-                     label="Actual P(y > 0)")
-            ax1.plot(x, sub["PredRate"], color="#4C72B0", marker="s", linewidth=2,
-                     linestyle="--", label="Predicted P(y > 0)")
+            ax1.plot(x, sub["ActualMean"], color="#C44E52", marker="o", linewidth=2,
+                     label="Actual E[y]")
+            ax1.plot(x, sub["PredMean"], color="#4C72B0", marker="s", linewidth=2,
+                     linestyle="--", label="Predicted E[y]")
             ax1.set_xlabel(var)
-            ax1.set_ylabel("P(call_counts > 0)")
-            max_rate = float(max(sub["ActualRate"].max(), sub["PredRate"].max()))
-            ax1.set_ylim(0, min(1.0, max_rate * 1.15 + 0.05))
+            ax1.set_ylabel("Marginal mean call_counts")
             ax1.set_xticks(x)
             ax1.set_xticklabels(labels, rotation=45, ha="right")
 
@@ -144,21 +178,21 @@ def plot_actual_vs_pred(valid_table, varlist, segment, prefix):
             ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
 
             fig.suptitle(
-                f"{var}: actual vs predicted P(y > 0) ({segment} {sample})", y=1.02
+                f"{var}: actual vs predicted marginal mean E[y] ({segment} {sample})", y=1.02
             )
             plt.tight_layout()
             filename = (
-                f"{prefix}actual_vs_pred_{segment.lower()}_{var}_{sample.lower()}.png"
+                f"{prefix}actual_vs_pred_marginal_{segment.lower()}_{var}_{sample.lower()}.png"
             )
             fig.savefig(f"plots/{filename}", dpi=150, bbox_inches="tight")
             plt.close(fig)
             print(f"[saved] plots/{filename}")
 
 
-# Step 3: Build validdat. Use original-scale features from Auto_train_imputed
-# (so we can re-bin numerics the same way as the EDA) joined with lr_pred for
-# the model's predicted probabilities. Both Train and Val rows are kept; the
-# plotter splits them so we can see calibration on each split separately.
+# Step 4: Build validdat. Use original-scale features from Auto_train_imputed
+# (same bins/caps as EDA section 4) joined with hurdle_pred. Both Train and
+# Val rows are kept; the plotter splits them so we can see calibration on
+# each split separately.
 auto_varlist = [
     "binned_12m_call_history", "acq_method", "binned_ann_prm_amt", "bi_limit_group",
     "digital_contact_ind", "geo_group", "has_prior_carrier", "binned_home_lot_sq_footage",
@@ -191,11 +225,11 @@ conn.execute("""
             b.Sample,
             b.pred
         FROM Auto_train_imputed AS a
-        JOIN lr_pred AS b
+        JOIN hurdle_pred AS b
         ON a.id = b.id;
 """)
 
 auto_valid_table = build_valid_table(conn, auto_varlist)
-plot_actual_vs_pred(auto_valid_table, auto_varlist, "Auto", "12_")
+plot_actual_vs_pred(auto_valid_table, auto_varlist, "Auto", "14_")
 
 conn.close()
