@@ -113,10 +113,10 @@ Equivalently:
 
 Plan in this repo (see README):
 - Baselines:    ZIP, ZINB.
-- Hurdle:       stage 1 logistic for P(Y > 0); stage 2 NB or LightGBM/XGBoost
-                with NB loss for E[Y | Y > 0] on rows with Y > 0.
+- Hurdle:       stage 1 logistic for P(Y > 0); stage 2 zero-truncated NB for
+                E[Y | Y > 0] on rows with Y > 0.
                 Combined prediction: y_hat = P(Y > 0) * E[Y | Y > 0].
-- Experiment order: ZIP -> ZINB -> Hurdle(binary + NB) -> Hurdle(binary + boosting).
+- Experiment order: ZIP -> ZINB -> Hurdle(binary + zero-truncated NB).
 """
 # =====================================================================
 # Section 2: Auto vs NonAuto variable comparison (03_)

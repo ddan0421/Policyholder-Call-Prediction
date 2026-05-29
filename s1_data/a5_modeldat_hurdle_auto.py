@@ -29,10 +29,6 @@ Step 2: Stage 1 - Logistic Regression data prep (binary classification)
 
 Step 3: Stage 2 - Negative Binomial data prep (count regression)
     Split train/val, one-hot encode (drop_first=True), standardize numerics, save.
-
-Step 4: Stage 2 - Machine Learning data prep (count regression for trees / boosting)
-    Split train/val (same random_state as Step 3), one-hot encode (drop_first=False),
-    save. Reuses y_train_auto_count / y_val_auto_count from Step 3.
 """
 
 # Step 1: Apply cap and log1p transformations and build hurdle data layout
@@ -179,47 +175,6 @@ for table_name, df in tables.items():
 print(conn.execute("SHOW TABLES").fetchall())
 
 print("Stage 2 Count Regression (NB) Auto Dataset Prep is done.")
-
-
-#################### Step 4: Stage 2 - Machine Learning Data Prep ####################
-# Note: ML stage reuses y_train_auto_count / y_val_auto_count saved by the
-# NB block above (same train_test_split with random_state=42 -> identical
-# row positions). Run the NB block first.
-
-train_count_ml = load_df(conn, "Auto_train_count")
-test_count_ml = load_df(conn, "Auto_test_count")
-
-X = train_count_ml.drop(["call_counts"], axis=1)
-y = train_count_ml[["id", "call_counts"]]
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# ML stage: keep all dummy levels (drop_first=False) and skip standardization
-# since trees / boosters are scale-invariant.
-X_train_encoded, count_ml_transformer = fit_transformer(
-    X_train,
-    nominal_cat=nominal_cat,
-    drop_first=False,
-    numeric_cols=None,
-    standardize=False,
-)
-X_val_encoded = apply_transformer(X_val, count_ml_transformer)
-test_encoded = apply_transformer(test_count_ml, count_ml_transformer)
-
-save_transformer(count_ml_transformer, os.path.join(auto_model_dir, "auto_count_ml_transformer.pkl"))
-
-tables = {
-    "X_train_auto_count_ml": X_train_encoded,
-    "X_val_auto_count_ml": X_val_encoded,
-    "test_auto_count_ml": test_encoded
-}
-
-for table_name, df in tables.items():
-    save_df(conn, df, table_name, add_id=False)
-
-print(conn.execute("SHOW TABLES").fetchall())
-
-print("Stage 2 Count Regression (ML) Auto Dataset Prep is done.")
-
 
 
 conn.close()

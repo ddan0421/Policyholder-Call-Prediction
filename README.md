@@ -29,7 +29,7 @@ Below is the **plan**; implementation is still in progress.
 
 - **Hurdle (two stages)**  
   - Stage 1: predict P(Y > 0).  
-  - Stage 2: on rows with Y > 0, predict E[Y | Y > 0], e.g. negative binomial or **boosting with NB loss** objective.  
+  - Stage 2: on rows with Y > 0, predict E[Y | Y > 0] with a zero-truncated negative binomial.  
   - Combined: ŷ = P(Y > 0) × E[Y | Y > 0].
 
 ### Count distributions: Poisson vs Negative Binomial
@@ -111,7 +111,7 @@ In this project, only the NB2 form is used — it lets the model learn how μ va
 | Mean | μ | μ |
 | Variance | μ | μ + α μ² |
 | Handles overdispersion | No | Yes |
-| Used as P_count in | Poisson GLM, ZIP, hurdle stage 2 (Poisson) | NB regression, ZINB, hurdle stage 2 (zero-truncated NB / boosted-NB) |
+| Used as P_count in | Poisson GLM, ZIP, hurdle stage 2 (Poisson) | NB regression, ZINB, hurdle stage 2 (zero-truncated NB) |
 
 ### Zero-inflated vs hurdle: how each approach treats zeros
 
@@ -164,7 +164,7 @@ $$
 P(Y=k \mid X) = (1-\pi(X)) \cdot \frac{P_{\mathrm{count}}(k \mid X)}{1 - P_{\mathrm{count}}(0 \mid X)}, \quad k > 0
 $$
 
-The two stages are estimated **independently**, and stage 2 can be a different model family (e.g. logistic for stage 1, NB or boosted-NB for stage 2).
+The two stages are estimated **independently** (logistic for stage 1, zero-truncated NB for stage 2 in this project).
 
 #### Side-by-side
 
@@ -188,8 +188,59 @@ The two stages are estimated **independently**, and stage 2 can be a different m
 4. Hurdle: binary + zero-truncated negative binomial  
     statsmodels zero-truncated negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.truncated_model.TruncatedLFNegativeBinomialP.html
 
-5. Hurdle: binary + boosting (with NB loss)
-    xgboost negative-binomial: https://xgboost-distribution.readthedocs.io/en/latest/api/xgboost_distribution.XGBDistribution.html
+## Metrics (planned)
+
+- **RMSE** on validation for comparing predictions.  
+- **AIC** for classical models where it applies.  
+- **Normalized Gini** — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate at the top of the ranking. Range is roughly [-1, 1]; **1.0 = perfect ranking, 0 = random, negative = anti-correlated**.
+
+### Normalized Gini
+
+Sort rows by predicted call counts (descending; highest-risk first). Let N be the number of observations and a<sub>i</sub> the actual call count at rank i (so a₁ is at the highest predicted, a<sub>N</sub> at the lowest predicted). Define:
+
+$$
+G(\hat y) = \frac{1}{N}\left(\frac{\sum_{k=1}^{N} \sum_{i=1}^{k} a_i}{\sum_{i=1}^{N} a_i} - \frac{N+1}{2}\right)
+$$
+
+Then the normalized Gini is:
+
+$$
+\text{Normalized Gini} = \frac{G(\hat y)}{G(y)}
+$$
+
+where G(y) is the same quantity computed with predictions equal to the true counts (perfect ranking).
+
+## Further research
+
+This project intentionally builds the hurdle model "by hand" — fit the stage 1 logistic, fit the stage 2 zero-truncated NB independently, then combine `ŷ = P(Y > 0) × E[Y | Y > 0]` for prediction. The reasons are pedagogical: each stage's coefficients, p-values, and diagnostics stay separately inspectable, and there's no joint-likelihood machinery to debug when something goes wrong.
+
+A few directions that could naturally extend this work but are not demonstrated here:
+
+### All-in-one statsmodels `HurdleCountModel` (not used here)
+
+statsmodels (>= 0.14.0) ships a single-call hurdle implementation that bundles both stages into one `fit()`:
+
+- https://www.statsmodels.org/dev/generated/statsmodels.discrete.truncated_model.HurdleCountModel.html
+
+Sketch:
+
+```python
+from statsmodels.discrete.truncated_model import HurdleCountModel
+
+model = HurdleCountModel(
+    endog=y,
+    exog=X,
+    dist="negbin",      # zero-truncated count side ('poisson' or 'negbin')
+    zerodist="poisson", # zero hurdle side ('poisson' or 'negbin')
+    p=2,                # NB2 parameterization for the count side
+)
+result = model.fit()
+mu_hat = result.predict(X)   # already returns the combined hurdle expectation
+```
+
+I can simply do this too, but for this project I am creating the hurdle method by myself so each stage is transparent and the parametric pieces (logit + zero-truncated NB) match the formulas written out above one-for-one. `HurdleCountModel` would have produced a comparable point estimate in a single line — useful as a one-shot baseline if you want to skip the manual two-stage pipeline.
+
+A small caveat for anyone trying it: `HurdleCountModel`'s `zerodist` is not a logistic regression — it uses a Poisson or NegBin model whose `P(Y = 0)` plays the role of the hurdle's "zero probability". That's mathematically a slightly different stage 1 than the logit used in this project. If you want the classical logit-then-NB hurdle, the manual approach in this repo is what you want.
 
 ### Bayesian alternative with PyMC (not demonstrated here)
 
@@ -213,24 +264,18 @@ How the Bayesian (PyMC) approach differs from the frequentist (statsmodels) appr
 
 In short: the model **structure** (the same ZIP/ZINB/hurdle PMFs and link functions) is identical between the two approaches. The difference is how parameters are estimated and how uncertainty is reported.
 
-## Metrics (planned)
+### ML hurdle with boosting (not demonstrated here)
 
-- **RMSE** on validation for comparing predictions.  
-- **AIC** for classical models where it applies.  
-- **Normalized Gini** — rank-based metric: sort policies by predicted call counts and measure how well actual calls concentrate at the top of the ranking. Range is roughly [-1, 1]; **1.0 = perfect ranking, 0 = random, negative = anti-correlated**.
+Beyond the parametric setup used in this project, the same hurdle decomposition can be implemented with a non-parametric / machine-learning back-end:
 
-### Normalized Gini
+- **Stage 1:** a boosted classifier (XGBoost / LightGBM with binary log loss) for P(Y > 0).
+- **Stage 2:** a boosted regressor with a count-aware loss (Poisson, zero-truncated Poisson, or a Negative Binomial distribution loss) for E[Y | Y > 0].
 
-Sort rows by predicted call counts (descending; highest-risk first). Let N be the number of observations and a<sub>i</sub> the actual call count at rank i (so a₁ is at the highest predicted, a<sub>N</sub> at the lowest predicted). Define:
+This is the natural extension of the parametric hurdle when the data carries strong interactions or non-linearities that a linear log-link cannot capture.
 
-$$
-G(\hat y) = \frac{1}{N}\left(\frac{\sum_{k=1}^{N} \sum_{i=1}^{k} a_i}{\sum_{i=1}^{N} a_i} - \frac{N+1}{2}\right)
-$$
+These ML models can be **hard to tune and hard to control**, especially when the positive subset is small (~14K rows for Auto here). They require careful **early stopping** to prevent the booster from memorizing training noise, plus tree-depth / leaf-size regularization, and — for distributional losses like NB — even tighter control because two parameters are predicted per row instead of one. In a quick check with default XGBoost hyperparameters on this dataset, train Gini reached ~0.82 while val Gini collapsed to ~0.09 — the textbook overfit signature. Recovering useful val numbers requires a much larger hyperparameter search than the parametric pipeline, so I stick to the parametric hurdle here.
 
-Then the normalized Gini is:
+For readers interested in the ML-hurdle direction, the literature is rich:
 
-$$
-\text{Normalized Gini} = \frac{G(\hat y)}{G(y)}
-$$
-
-where G(y) is the same quantity computed with predictions equal to the true counts (perfect ranking).
+- Krasniqi, Bardet, Rynkiewicz (2023). *Parametric and XGBoost Hurdle Model for estimating accident frequency.* HAL preprint: https://hal.science/hal-03739838v2 — uses XGBoost for stage 2 with a custom zero-truncated Poisson loss, applied to a French car-insurance portfolio.
+- Xu, Ye, Gao, Chu (2024). *Generalized hurdle count data models based on interpretable machine learning with an application to health care demand.* *Computing* 106:295–325: https://doi.org/10.1007/s00607-023-01224-3 — extends the hurdle to decision tree / random forest / SVM / XGBoost in both stages, with variable importance and break-down plots for interpretability.
