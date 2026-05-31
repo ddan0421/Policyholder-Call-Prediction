@@ -34,8 +34,8 @@ conn = duckdb.connect(database=database_path, read_only=True)
 # X_*_count_nb / y_*_count are already filtered to call_counts > 0.
 X_train = load_df(conn, "X_train_auto_count_nb", exclude_cols=["id"])
 X_val = load_df(conn, "X_val_auto_count_nb", exclude_cols=["id"])
-y_train = load_df(conn, "y_train_auto_count", exclude_cols=["id"])["call_counts"].to_numpy()
-y_val = load_df(conn, "y_val_auto_count", exclude_cols=["id"])["call_counts"].to_numpy()
+y_train = load_df(conn, "y_train_auto_count_nb", exclude_cols=["id"])["call_counts"].to_numpy()
+y_val = load_df(conn, "y_val_auto_count_nb", exclude_cols=["id"])["call_counts"].to_numpy()
 
 conn.close()
 

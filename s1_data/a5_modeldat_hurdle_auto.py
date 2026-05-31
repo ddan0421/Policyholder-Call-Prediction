@@ -168,8 +168,8 @@ tables = {
     "X_train_auto_count_nb": X_train_encoded,
     "X_val_auto_count_nb": X_val_encoded,
     "test_auto_count_nb": test_encoded,
-    "y_train_auto_count": y_train,
-    "y_val_auto_count": y_val
+    "y_train_auto_count_nb": y_train,
+    "y_val_auto_count_nb": y_val
 }
 
 for table_name, df in tables.items():
