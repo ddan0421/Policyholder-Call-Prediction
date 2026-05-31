@@ -62,7 +62,8 @@ for stage in ["binary", "count"]:
                 , has_prior_carrier
                 , home_lot_sq_footage
                 , IF(household_group = '2autodwelling', 1, 0) AS _household_group
-                , LEAST(household_policy_counts, 4) AS _household_policy_counts
+                , LEAST(household_policy_counts, 2) AS _household_policy_counts_le2
+                , GREATEST(LEAST(household_policy_counts, 4) - 2, 0) AS _household_policy_counts_gt2
                 , newest_veh_age
                 , pol_edeliv_ind_filled
                 , prdct_sbtyp_grp
@@ -84,7 +85,8 @@ for stage in ["binary", "count"]:
             , has_prior_carrier AS has_prior_carrier
             , home_lot_sq_footage AS home_lot_sq_footage
             , _household_group AS household_group
-            , _household_policy_counts AS household_policy_counts
+            , _household_policy_counts_le2 AS household_policy_counts_le2
+            , _household_policy_counts_gt2 AS household_policy_counts_gt2
             , newest_veh_age AS newest_veh_age
             , pol_edeliv_ind_filled AS pol_edeliv_ind
             , prdct_sbtyp_grp AS prdct_sbtyp_grp
@@ -103,7 +105,8 @@ nominal_cat = [
 ]
 numeric_cols = [
     "12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
-    "household_policy_counts", "newest_veh_age", "tenure_at_snapshot",
+    "household_policy_counts_le2", "household_policy_counts_gt2",
+    "newest_veh_age", "tenure_at_snapshot",
 ]
 
 #################### Step 2: Stage 1 - Logistic Regression Data Prep ####################
