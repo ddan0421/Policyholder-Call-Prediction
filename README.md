@@ -1,7 +1,5 @@
 # Policyholder Call Prediction
 
-Project Status: Work in Progress
-
 **Goal:** Build a model to predict how often policyholders call, to help CloverShield Insurance plan call-center resources.  
 Below is the **plan**; implementation is still in progress.
 
@@ -27,7 +25,7 @@ Below is the **plan**; implementation is still in progress.
 
 **More advanced**
 
-- **Hurdle (two stages)**  
+- **Hurdle (two stages)** ([Mullahy, 1986](#references); [Gurmu, 1998](#references))  
   - Stage 1: predict P(Y > 0).  
   - Stage 2: on rows with Y > 0, predict E[Y | Y > 0] with a zero-truncated negative binomial.  
   - Combined: ŷ = P(Y > 0) × E[Y | Y > 0].
@@ -151,7 +149,7 @@ The count distribution is allowed to **also produce zeros**. ZIP/ZINB makes the 
 
 #### Hurdle
 
-A hurdle model splits zeros and positives **cleanly**:
+Following [Mullahy (1986)](#references), a hurdle model splits zeros and positives **cleanly**; [Gurmu (1998)](#references) extends this framework to generalized hurdle count regression (e.g. flexible choice of count distribution on the positive part).
 
 1. **Stage 1 (binary)** — logistic regression on Y > 0. All zeros come from this stage only.
 2. **Stage 2 (zero-truncated count)** — fit on rows with Y > 0 only, using a count distribution that **cannot produce zeros**.
@@ -185,7 +183,7 @@ The two stages are estimated **independently** (logistic for stage 1, zero-trunc
 3. Zero-inflated negative binomial (ZINB)  
     https://www.statsmodels.org/dev/generated/statsmodels.discrete.count_model.ZeroInflatedNegativeBinomialP.html
 
-4. Hurdle: binary + zero-truncated negative binomial  
+4. Hurdle: binary + zero-truncated negative binomial ([Mullahy, 1986](#references); [Gurmu, 1998](#references))  
     statsmodels zero-truncated negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.truncated_model.TruncatedLFNegativeBinomialP.html
 
 ## Metrics (planned)
@@ -279,3 +277,9 @@ For readers interested in the ML-hurdle direction, the literature is rich:
 
 - Krasniqi, Bardet, Rynkiewicz (2023). *Parametric and XGBoost Hurdle Model for estimating accident frequency.* HAL preprint: https://hal.science/hal-03739838v2 — uses XGBoost for stage 2 with a custom zero-truncated Poisson loss, applied to a French car-insurance portfolio.
 - Xu, Ye, Gao, Chu (2024). *Generalized hurdle count data models based on interpretable machine learning with an application to health care demand.* *Computing* 106:295–325: https://doi.org/10.1007/s00607-023-01224-3 — extends the hurdle to decision tree / random forest / SVM / XGBoost in both stages, with variable importance and break-down plots for interpretability.
+
+## References
+
+- Mullahy, J. (1986). Specification and testing of some modified count data models. *Journal of Econometrics*, 33, 341–365. https://doi.org/10.1016/0304-4076(86)90002-3
+
+- Gurmu, S. (1998). Generalized hurdle count data regression models. *Economics Letters*, 58(3), 263–268. https://doi.org/10.1016/S0165-1765(97)00295-4
