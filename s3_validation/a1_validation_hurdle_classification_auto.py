@@ -7,14 +7,12 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 
-from s1_data.a0_setup_directories import auto_model_dir
+from s1_data.a0_setup_directories import auto_model_dir, non_auto_model_dir
 from s1_data.db_utils import load_df
 
 base_folder = "data"
 database = "TravelersPolicyHolderCall.duckdb"
 database_path = os.path.join(base_folder, database)
-
-conn = duckdb.connect(database=database_path, read_only=True)
 
 
 def load_pkl(path):
@@ -22,39 +20,7 @@ def load_pkl(path):
         return pickle.load(f)
 
 
-lr_model = load_pkl(os.path.join(auto_model_dir, "lr_model_auto.pkl"))
-
-
-# Step 1: Score the train and val splits with the saved Logit model.
-# Loaded with id kept (no exclude_cols) so we can attach the model id to predictions
-# and join back to original-scale features in DuckDB.
-X_train = load_df(conn, "X_train_auto_binary")
-X_val = load_df(conn, "X_val_auto_binary")
-
-X_train_const = sm.add_constant(X_train.drop(columns=["id"]), has_constant="add")
-X_val_const = sm.add_constant(X_val.drop(columns=["id"]), has_constant="add")
-
-lr_train_pred = lr_model.predict(X_train_const)
-lr_val_pred = lr_model.predict(X_val_const)
-
-
-# Step 2: Build a (id, pred, Sample) table for join. We only keep what we need;
-# the original features are read from Auto_train_imputed inside the SQL below.
-lr_pred = pd.concat(
-    [
-        pd.DataFrame({"id": X_train["id"].to_numpy(), "pred": lr_train_pred.to_numpy(), "Sample": "Train"}),
-        pd.DataFrame({"id": X_val["id"].to_numpy(),   "pred": lr_val_pred.to_numpy(),   "Sample": "Val"}),
-    ],
-    axis=0,
-    ignore_index=True,
-)
-
-# Register so DuckDB can JOIN against it (avoids relying on replacement scans).
-conn.register("lr_pred", lr_pred)
-
-
 def _sort_by_valvar(df):
-    """Sort numerically when ValVar is numeric-looking, alphabetically otherwise."""
     try:
         out = df.copy()
         out["_sort_key"] = out["ValVar"].astype(float)
@@ -105,7 +71,6 @@ def build_valid_table(conn, varlist):
 
 
 def plot_actual_vs_pred(valid_table, varlist, segment, prefix):
-    """One PNG per (variable, sample): overlay actual vs predicted P(y > 0)."""
     os.makedirs("plots", exist_ok=True)
     samples = sorted(valid_table["Sample"].dropna().unique())
     for var in varlist:
@@ -155,11 +120,7 @@ def plot_actual_vs_pred(valid_table, varlist, segment, prefix):
             print(f"[saved] plots/{filename}")
 
 
-# Step 3: Build validdat. Use original-scale features from Auto_train_imputed
-# (so we can re-bin numerics the same way as the EDA) joined with lr_pred for
-# the model's predicted probabilities. Both Train and Val rows are kept; the
-# plotter splits them so we can see calibration on each split separately.
-auto_varlist = [
+AUTO_VARLIST = [
     "binned_12m_call_history", "acq_method", "binned_ann_prm_amt", "bi_limit_group",
     "digital_contact_ind", "geo_group", "has_prior_carrier", "binned_home_lot_sq_footage",
     "household_group", "capped_household_policy_counts", "newest_veh_age",
@@ -167,7 +128,15 @@ auto_varlist = [
     "telematics_ind", "binned_tenure_at_snapshot",
 ]
 
-conn.execute("""
+NONAUTO_VARLIST = [
+    "binned_12m_call_history", "acq_method", "binned_ann_prm_amt",
+    "digital_contact_ind", "geo_group", "has_prior_carrier", "binned_home_lot_sq_footage",
+    "household_group", "capped_household_policy_counts",
+    "pay_type_code", "pol_edeliv_ind_filled", "prdct_sbtyp_grp", "product_sbtyp",
+    "trm_len_mo", "binned_tenure_at_snapshot",
+]
+
+AUTO_VALIDDAT_SQL = """
     CREATE OR REPLACE TEMP TABLE validdat AS
         SELECT
             LEAST((a."12m_call_history" / 5)::INT * 5, 40) AS binned_12m_call_history,
@@ -193,9 +162,71 @@ conn.execute("""
         FROM Auto_train_imputed AS a
         JOIN lr_pred AS b
         ON a.id = b.id;
-""")
+"""
 
-auto_valid_table = build_valid_table(conn, auto_varlist)
-plot_actual_vs_pred(auto_valid_table, auto_varlist, "Auto", "12_")
+NONAUTO_VALIDDAT_SQL = """
+    CREATE OR REPLACE TEMP TABLE validdat AS
+        SELECT
+            LEAST((a."12m_call_history" / 5)::INT * 5, 30) AS binned_12m_call_history,
+            a.acq_method,
+            LEAST((a.ann_prm_amt / 900)::INT * 900, 7200) AS binned_ann_prm_amt,
+            a.digital_contact_ind,
+            a.geo_group,
+            a.has_prior_carrier,
+            (a.home_lot_sq_footage / 10000)::INT * 10000 AS binned_home_lot_sq_footage,
+            a.household_group,
+            LEAST(a.household_policy_counts, 5) AS capped_household_policy_counts,
+            a.pay_type_code,
+            a.pol_edeliv_ind_filled,
+            a.prdct_sbtyp_grp,
+            a.product_sbtyp,
+            LEAST((a.tenure_at_snapshot / 100)::INT * 100, 500) AS binned_tenure_at_snapshot,
+            a.trm_len_mo,
+            a.call_counts,
+            b.Sample,
+            b.pred
+        FROM NonAuto_train_imputed AS a
+        JOIN lr_pred AS b
+        ON a.id = b.id;
+"""
 
-conn.close()
+SEGMENTS = [
+    ("auto",    auto_model_dir,     AUTO_VARLIST,    AUTO_VALIDDAT_SQL,    "Auto",    "12_"),
+    ("nonauto", non_auto_model_dir, NONAUTO_VARLIST, NONAUTO_VALIDDAT_SQL, "NonAuto", "15_"),
+]
+
+
+for segment, model_dir, varlist, validdat_sql, segment_label, prefix in SEGMENTS:
+    print("=" * 80)
+    print(f"Hurdle stage 1 calibration ({segment_label})")
+    print("=" * 80)
+
+    conn = duckdb.connect(database=database_path, read_only=True)
+
+    lr_model = load_pkl(os.path.join(model_dir, f"lr_model_{segment}.pkl"))
+
+    # Keep `id` so we can join predictions back to original-scale features.
+    X_train = load_df(conn, f"X_train_{segment}_binary")
+    X_val = load_df(conn, f"X_val_{segment}_binary")
+
+    X_train_const = sm.add_constant(X_train.drop(columns=["id"]), has_constant="add")
+    X_val_const = sm.add_constant(X_val.drop(columns=["id"]), has_constant="add")
+
+    lr_train_pred = lr_model.predict(X_train_const)
+    lr_val_pred = lr_model.predict(X_val_const)
+
+    lr_pred = pd.concat(
+        [
+            pd.DataFrame({"id": X_train["id"].to_numpy(), "pred": lr_train_pred.to_numpy(), "Sample": "Train"}),
+            pd.DataFrame({"id": X_val["id"].to_numpy(),   "pred": lr_val_pred.to_numpy(),   "Sample": "Val"}),
+        ],
+        axis=0,
+        ignore_index=True,
+    )
+    conn.register("lr_pred", lr_pred)
+
+    conn.execute(validdat_sql)
+    valid_table = build_valid_table(conn, varlist)
+    plot_actual_vs_pred(valid_table, varlist, segment_label, prefix)
+
+    conn.close()
