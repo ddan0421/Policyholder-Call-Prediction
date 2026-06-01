@@ -10,7 +10,14 @@ from sklearn.model_selection import train_test_split
 
 from s1_data.a0_setup_directories import auto_model_dir, non_auto_model_dir
 from s1_data.db_utils import load_df
-from s1_data.transform_utils import apply_transformer, load_transformer
+from s1_data.transform_utils import (
+    apply_transformer,
+    load_transformer,
+    transform_binary_auto,
+    transform_binary_nonauto,
+    transform_count_auto,
+    transform_count_nonauto,
+)
 from s3_validation.model_evaluation import normalized_gini
 
 warnings.filterwarnings("ignore")
@@ -18,47 +25,35 @@ warnings.filterwarnings("ignore")
 """
 Hurdle final prediction for both Auto and NonAuto segments.
 
-Combines stage 1 (logistic, P(Y > 0 | X)) with stage 2 (Negative Binomial on
-the positive-count subset, E[Y | Y > 0, X]) to produce hurdle predictions on
-the validation set:
+y_hat(X) = P(Y > 0 | X) * E[Y | Y > 0, X]
 
-    y_hat(X) = P(Y > 0 | X) * E[Y | Y > 0, X]
-
-Both models and their feature transformers (one-hot + scaler) are loaded from
-{segment}_models/. The same raw val rows go through each transformer
-separately because each stage was standardized against a different sample
-(full train vs. positive-only train), so their fitted means and SDs differ.
-
-Evaluated against actual call_counts (full y, including zeros) using RMSE
-and normalized Gini.
+Per segment: split {Segment}_train_imputed (random_state=42) to recover the
+val rows, run each stage's SQL feature transform on the val subset, apply the
+saved sklearn transformer + model, and multiply for the hurdle product.
+Evaluated against actual call_counts (full y, including zeros).
 """
 
 base_folder = "data"
 database = "TravelersPolicyHolderCall.duckdb"
 database_path = os.path.join(base_folder, database)
 
-# Segment label drives both the model_dir and the SQL/table-name conventions.
-# `imputed_table` is title-cased ("Auto" / "NonAuto") to match how the source
-# DuckDB tables were created in s1_data/.
 SEGMENTS = [
-    ("auto",    auto_model_dir,    "Auto"),
-    ("nonauto", non_auto_model_dir, "NonAuto"),
+    ("auto",    auto_model_dir,     "Auto",    transform_binary_auto,    transform_count_auto),
+    ("nonauto", non_auto_model_dir, "NonAuto", transform_binary_nonauto, transform_count_nonauto),
 ]
 
 
 def transform_and_constant(df_raw, transformer):
-    """Apply transformer, drop id, add constant column. Mirrors the training-time path."""
     X = apply_transformer(df_raw, transformer)
     X = X.drop(columns=["id"])
     return sm.add_constant(X, has_constant="add")
 
 
-for segment, model_dir, imputed_table in SEGMENTS:
+for segment, model_dir, imputed_table, sql_binary, sql_count in SEGMENTS:
     print("=" * 80)
     print(f"Hurdle final prediction ({segment} val)")
     print("=" * 80)
 
-    # Step 1: Load both stage models and their feature transformers
     with open(os.path.join(model_dir, f"lr_model_{segment}.pkl"), "rb") as f:
         lr_model = pickle.load(f)
     with open(os.path.join(model_dir, f"nb_model_{segment}.pkl"), "rb") as f:
@@ -71,33 +66,28 @@ for segment, model_dir, imputed_table in SEGMENTS:
         os.path.join(model_dir, f"{segment}_count_nb_transformer.pkl")
     )
 
-    # Step 2: Recover the validation rows by re-running the same train_test_split
-    # (random_state=42) used in the stage-model data prep -- guaranteed to land
-    # on the exact rows the models never saw
-    # {Segment}_train_binary supplies the SQL-transformed features;
-    # {Segment}_train_imputed supplies the actual call_counts target. Drop
-    # nonzero_call via SQL EXCLUDE since the hurdle product is evaluated on
-    # call_counts directly
     conn = duckdb.connect(database=database_path, read_only=True)
-    X_raw = load_df(conn, f"{imputed_table}_train_binary", exclude_cols=["nonzero_call"])
-    y_raw = load_df(conn, f"{imputed_table}_train_imputed")[["id", "call_counts"]]
-    conn.close()
+    raw = load_df(conn, f"{imputed_table}_train_imputed")
+    X_raw = raw.drop(columns=["call_counts"])
+    y_raw = raw[["id", "call_counts"]]
 
     _, X_val_raw, _, y_val_meta = train_test_split(
         X_raw, y_raw, test_size=0.2, random_state=42
     )
     y_val = y_val_meta["call_counts"].to_numpy()
 
-    # Step 3: Apply each stage's transformer to the SAME raw val rows
-    X_val_binary = transform_and_constant(X_val_raw, binary_transformer)
-    X_val_count = transform_and_constant(X_val_raw, count_transformer)
+    # SQL feature transforms (no targets needed for scoring)
+    X_val_binary_raw = sql_binary(conn, X_val_raw, has_target=False)
+    X_val_count_raw = sql_count(conn, X_val_raw, has_target=False)
+    conn.close()
 
-    # Step 4: Stage 1 + Stage 2 predictions and the hurdle product
+    X_val_binary = transform_and_constant(X_val_binary_raw, binary_transformer)
+    X_val_count = transform_and_constant(X_val_count_raw, count_transformer)
+
     prob_y_gt_0 = np.asarray(lr_model.predict(X_val_binary))
     mu_y_given_pos = np.asarray(nb_model.predict(X_val_count))
     y_hat = prob_y_gt_0 * mu_y_given_pos
 
-    # Step 5: Score against actual call_counts (full y, including zeros)
     rmse = root_mean_squared_error(y_val, y_hat)
     ng = normalized_gini(y_val, y_hat)
 
