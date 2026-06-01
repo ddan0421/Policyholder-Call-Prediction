@@ -1,9 +1,8 @@
 # Policyholder Call Prediction
 
-**Goal:** Build a model to predict how often policyholders call, to help CloverShield Insurance plan call-center resources.  
-Below is the **plan**; implementation is still in progress.
+**Goal:** Build a model to predict how often policyholders call, to help CloverShield Insurance plan call-center resources.
 
-## Data processing (planned)
+## Data processing
 
 1. Split into **NonAuto** and **Auto**, and prepare each segment separately (drop fields that do not apply or are redundant for that segment).
 
@@ -13,7 +12,7 @@ Below is the **plan**; implementation is still in progress.
    - Train the imputer on **NonAuto train** only; apply to NonAuto train, val, and test.  
    - Train the imputer on **Auto train** only; apply to Auto train, val, and test.
 
-## Models (planned)
+## Models
 
 **Baselines**
 
@@ -173,7 +172,7 @@ The two stages are estimated **independently** (logistic for stage 1, zero-trunc
 | Estimation | Two parts fit jointly via MLE | Two parts fit independently |
 | Best fit when | Data is a mixture of "never callers" + an active count population | "Did the customer call at all?" is a different decision from "how many times?" |
 
-## Experiment order (planned)
+## Experiment order
 1. Poisson GLM (reference baseline)
     https://www.statsmodels.org/dev/generated/statsmodels.genmod.generalized_linear_model.GLM.html
 
@@ -186,7 +185,7 @@ The two stages are estimated **independently** (logistic for stage 1, zero-trunc
 4. Hurdle: binary + zero-truncated negative binomial ([Mullahy, 1986](#references); [Gurmu, 1998](#references))  
     statsmodels zero-truncated negative binomial: https://www.statsmodels.org/stable/generated/statsmodels.discrete.truncated_model.TruncatedLFNegativeBinomialP.html
 
-## Metrics (planned)
+## Metrics
 
 - **RMSE** on validation for comparing predictions.  
 - **AIC** for classical models where it applies.  
