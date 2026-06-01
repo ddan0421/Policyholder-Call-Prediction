@@ -1,0 +1,263 @@
+
+============================================================
+Running s3_validation.a1_validation_hurdle_classification
+============================================================
+
+================================================================================
+Hurdle stage 1 calibration (Auto)
+================================================================================
+[saved] plots/12_actual_vs_pred_auto_binned_12m_call_history_train.png
+[saved] plots/12_actual_vs_pred_auto_binned_12m_call_history_val.png
+[saved] plots/12_actual_vs_pred_auto_acq_method_train.png
+[saved] plots/12_actual_vs_pred_auto_acq_method_val.png
+[saved] plots/12_actual_vs_pred_auto_binned_ann_prm_amt_train.png
+[saved] plots/12_actual_vs_pred_auto_binned_ann_prm_amt_val.png
+[saved] plots/12_actual_vs_pred_auto_bi_limit_group_train.png
+[saved] plots/12_actual_vs_pred_auto_bi_limit_group_val.png
+[saved] plots/12_actual_vs_pred_auto_digital_contact_ind_train.png
+[saved] plots/12_actual_vs_pred_auto_digital_contact_ind_val.png
+[saved] plots/12_actual_vs_pred_auto_geo_group_train.png
+[saved] plots/12_actual_vs_pred_auto_geo_group_val.png
+[saved] plots/12_actual_vs_pred_auto_has_prior_carrier_train.png
+[saved] plots/12_actual_vs_pred_auto_has_prior_carrier_val.png
+[saved] plots/12_actual_vs_pred_auto_binned_home_lot_sq_footage_train.png
+[saved] plots/12_actual_vs_pred_auto_binned_home_lot_sq_footage_val.png
+[saved] plots/12_actual_vs_pred_auto_household_group_train.png
+[saved] plots/12_actual_vs_pred_auto_household_group_val.png
+[saved] plots/12_actual_vs_pred_auto_capped_household_policy_counts_train.png
+[saved] plots/12_actual_vs_pred_auto_capped_household_policy_counts_val.png
+[saved] plots/12_actual_vs_pred_auto_newest_veh_age_train.png
+[saved] plots/12_actual_vs_pred_auto_newest_veh_age_val.png
+[saved] plots/12_actual_vs_pred_auto_pay_type_code_train.png
+[saved] plots/12_actual_vs_pred_auto_pay_type_code_val.png
+[saved] plots/12_actual_vs_pred_auto_pol_edeliv_ind_filled_train.png
+[saved] plots/12_actual_vs_pred_auto_pol_edeliv_ind_filled_val.png
+[saved] plots/12_actual_vs_pred_auto_prdct_sbtyp_grp_train.png
+[saved] plots/12_actual_vs_pred_auto_prdct_sbtyp_grp_val.png
+[saved] plots/12_actual_vs_pred_auto_product_sbtyp_train.png
+[saved] plots/12_actual_vs_pred_auto_product_sbtyp_val.png
+[saved] plots/12_actual_vs_pred_auto_telematics_ind_train.png
+[saved] plots/12_actual_vs_pred_auto_telematics_ind_val.png
+[saved] plots/12_actual_vs_pred_auto_binned_tenure_at_snapshot_train.png
+[saved] plots/12_actual_vs_pred_auto_binned_tenure_at_snapshot_val.png
+================================================================================
+Hurdle stage 1 calibration (NonAuto)
+================================================================================
+[saved] plots/15_actual_vs_pred_nonauto_binned_12m_call_history_train.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_12m_call_history_val.png
+[saved] plots/15_actual_vs_pred_nonauto_acq_method_train.png
+[saved] plots/15_actual_vs_pred_nonauto_acq_method_val.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_ann_prm_amt_train.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_ann_prm_amt_val.png
+[saved] plots/15_actual_vs_pred_nonauto_digital_contact_ind_train.png
+[saved] plots/15_actual_vs_pred_nonauto_digital_contact_ind_val.png
+[saved] plots/15_actual_vs_pred_nonauto_geo_group_train.png
+[saved] plots/15_actual_vs_pred_nonauto_geo_group_val.png
+[saved] plots/15_actual_vs_pred_nonauto_has_prior_carrier_train.png
+[saved] plots/15_actual_vs_pred_nonauto_has_prior_carrier_val.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_home_lot_sq_footage_train.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_home_lot_sq_footage_val.png
+[saved] plots/15_actual_vs_pred_nonauto_household_group_train.png
+[saved] plots/15_actual_vs_pred_nonauto_household_group_val.png
+[saved] plots/15_actual_vs_pred_nonauto_capped_household_policy_counts_train.png
+[saved] plots/15_actual_vs_pred_nonauto_capped_household_policy_counts_val.png
+[saved] plots/15_actual_vs_pred_nonauto_pay_type_code_train.png
+[saved] plots/15_actual_vs_pred_nonauto_pay_type_code_val.png
+[saved] plots/15_actual_vs_pred_nonauto_pol_edeliv_ind_filled_train.png
+[saved] plots/15_actual_vs_pred_nonauto_pol_edeliv_ind_filled_val.png
+[saved] plots/15_actual_vs_pred_nonauto_prdct_sbtyp_grp_train.png
+[saved] plots/15_actual_vs_pred_nonauto_prdct_sbtyp_grp_val.png
+[saved] plots/15_actual_vs_pred_nonauto_product_sbtyp_train.png
+[saved] plots/15_actual_vs_pred_nonauto_product_sbtyp_val.png
+[saved] plots/15_actual_vs_pred_nonauto_trm_len_mo_train.png
+[saved] plots/15_actual_vs_pred_nonauto_trm_len_mo_val.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_tenure_at_snapshot_train.png
+[saved] plots/15_actual_vs_pred_nonauto_binned_tenure_at_snapshot_val.png
+
+============================================================
+Running s3_validation.a2_validation_hurdle_count
+============================================================
+
+================================================================================
+Hurdle stage 2 calibration (Auto)
+================================================================================
+[saved] plots/13_actual_vs_pred_count_auto_binned_12m_call_history_train.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_12m_call_history_val.png
+[saved] plots/13_actual_vs_pred_count_auto_acq_method_train.png
+[saved] plots/13_actual_vs_pred_count_auto_acq_method_val.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_ann_prm_amt_train.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_ann_prm_amt_val.png
+[saved] plots/13_actual_vs_pred_count_auto_bi_limit_group_train.png
+[saved] plots/13_actual_vs_pred_count_auto_bi_limit_group_val.png
+[saved] plots/13_actual_vs_pred_count_auto_digital_contact_ind_train.png
+[saved] plots/13_actual_vs_pred_count_auto_digital_contact_ind_val.png
+[saved] plots/13_actual_vs_pred_count_auto_geo_group_train.png
+[saved] plots/13_actual_vs_pred_count_auto_geo_group_val.png
+[saved] plots/13_actual_vs_pred_count_auto_has_prior_carrier_train.png
+[saved] plots/13_actual_vs_pred_count_auto_has_prior_carrier_val.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_home_lot_sq_footage_train.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_home_lot_sq_footage_val.png
+[saved] plots/13_actual_vs_pred_count_auto_household_group_train.png
+[saved] plots/13_actual_vs_pred_count_auto_household_group_val.png
+[saved] plots/13_actual_vs_pred_count_auto_capped_household_policy_counts_train.png
+[saved] plots/13_actual_vs_pred_count_auto_capped_household_policy_counts_val.png
+[saved] plots/13_actual_vs_pred_count_auto_newest_veh_age_train.png
+[saved] plots/13_actual_vs_pred_count_auto_newest_veh_age_val.png
+[saved] plots/13_actual_vs_pred_count_auto_pay_type_code_train.png
+[saved] plots/13_actual_vs_pred_count_auto_pay_type_code_val.png
+[saved] plots/13_actual_vs_pred_count_auto_pol_edeliv_ind_filled_train.png
+[saved] plots/13_actual_vs_pred_count_auto_pol_edeliv_ind_filled_val.png
+[saved] plots/13_actual_vs_pred_count_auto_prdct_sbtyp_grp_train.png
+[saved] plots/13_actual_vs_pred_count_auto_prdct_sbtyp_grp_val.png
+[saved] plots/13_actual_vs_pred_count_auto_product_sbtyp_train.png
+[saved] plots/13_actual_vs_pred_count_auto_product_sbtyp_val.png
+[saved] plots/13_actual_vs_pred_count_auto_telematics_ind_train.png
+[saved] plots/13_actual_vs_pred_count_auto_telematics_ind_val.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_tenure_at_snapshot_train.png
+[saved] plots/13_actual_vs_pred_count_auto_binned_tenure_at_snapshot_val.png
+================================================================================
+Hurdle stage 2 calibration (NonAuto)
+================================================================================
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_12m_call_history_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_12m_call_history_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_acq_method_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_acq_method_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_ann_prm_amt_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_ann_prm_amt_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_digital_contact_ind_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_digital_contact_ind_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_geo_group_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_geo_group_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_has_prior_carrier_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_has_prior_carrier_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_home_lot_sq_footage_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_home_lot_sq_footage_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_household_group_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_household_group_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_capped_household_policy_counts_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_capped_household_policy_counts_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_pay_type_code_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_pay_type_code_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_pol_edeliv_ind_filled_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_pol_edeliv_ind_filled_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_prdct_sbtyp_grp_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_prdct_sbtyp_grp_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_product_sbtyp_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_product_sbtyp_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_trm_len_mo_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_trm_len_mo_val.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_tenure_at_snapshot_train.png
+[saved] plots/16_actual_vs_pred_count_nonauto_binned_tenure_at_snapshot_val.png
+
+============================================================
+Running s3_validation.a3_validation_hurdle_combined
+============================================================
+
+================================================================================
+Hurdle combined calibration (Auto)
+================================================================================
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_12m_call_history_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_12m_call_history_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_acq_method_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_acq_method_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_ann_prm_amt_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_ann_prm_amt_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_bi_limit_group_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_bi_limit_group_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_digital_contact_ind_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_digital_contact_ind_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_geo_group_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_geo_group_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_has_prior_carrier_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_has_prior_carrier_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_home_lot_sq_footage_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_home_lot_sq_footage_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_household_group_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_household_group_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_capped_household_policy_counts_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_capped_household_policy_counts_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_newest_veh_age_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_newest_veh_age_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_pay_type_code_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_pay_type_code_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_pol_edeliv_ind_filled_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_pol_edeliv_ind_filled_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_prdct_sbtyp_grp_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_prdct_sbtyp_grp_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_product_sbtyp_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_product_sbtyp_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_telematics_ind_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_telematics_ind_val.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_tenure_at_snapshot_train.png
+[saved] plots/14_actual_vs_pred_marginal_auto_binned_tenure_at_snapshot_val.png
+================================================================================
+Hurdle combined calibration (NonAuto)
+================================================================================
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_12m_call_history_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_12m_call_history_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_acq_method_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_acq_method_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_ann_prm_amt_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_ann_prm_amt_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_digital_contact_ind_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_digital_contact_ind_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_geo_group_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_geo_group_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_has_prior_carrier_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_has_prior_carrier_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_home_lot_sq_footage_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_home_lot_sq_footage_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_household_group_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_household_group_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_capped_household_policy_counts_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_capped_household_policy_counts_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_pay_type_code_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_pay_type_code_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_pol_edeliv_ind_filled_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_pol_edeliv_ind_filled_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_prdct_sbtyp_grp_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_prdct_sbtyp_grp_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_product_sbtyp_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_product_sbtyp_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_trm_len_mo_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_trm_len_mo_val.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_tenure_at_snapshot_train.png
+[saved] plots/17_actual_vs_pred_marginal_nonauto_binned_tenure_at_snapshot_val.png
+
+============================================================
+Running s3_validation.a4_validation_hurdle_val_metrics
+============================================================
+
+================================================================================
+Hurdle val performance (auto)
+================================================================================
+  n rows                : 4397
+  P(Y > 0)         range: [0.2478, 0.9061]
+  E[Y | Y > 0]     range: [34.5383, 91.8743]
+  y_hat            range: [9.4992, 81.1816]
+  Hurdle val RMSE             : 35.9157
+  Hurdle val NormalizedGini   : 0.3847
+
+================================================================================
+Hurdle val performance (nonauto)
+================================================================================
+  n rows                : 11603
+  P(Y > 0)         range: [0.2672, 0.8772]
+  E[Y | Y > 0]     range: [35.0061, 88.0467]
+  y_hat            range: [10.8839, 76.8521]
+  Hurdle val RMSE             : 36.1077
+  Hurdle val NormalizedGini   : 0.3687
+
+================================================================================
+Hurdle val performance (Auto + NonAuto)
+================================================================================
+  n rows                : 16000
+  y_hat            range: [9.4992, 81.1816]
+
+  Hurdle val RMSE             : 36.0550
+  Hurdle val NormalizedGini   : 0.3734
+
+
+============================================================
+All s3_validation scripts completed successfully.
+============================================================
