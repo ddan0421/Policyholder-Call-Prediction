@@ -32,79 +32,132 @@ Step 3: Stage 2 - Negative Binomial data prep (count regression)
 """
 
 # Step 1: Apply cap and log1p transformations and build hurdle data layout
-for stage in ["binary", "count"]:
-    for data in ["train", "test"]:
-        if data == "train":
-            if stage == "binary":
-                target_inner = ", IF(call_counts > 0, 1, 0) AS nonzero_call"
-                target_outer = ", nonzero_call AS nonzero_call"
-                row_filter = ""
-            else:  # count
-                target_inner = ", call_counts"
-                target_outer = ", call_counts AS call_counts"
-                row_filter = "WHERE call_counts > 0"
-        else:  # test (no target, no row filter)
-            target_inner = ""
-            target_outer = ""
-            row_filter = ""
 
-        conn.execute(f"""
-        CREATE OR REPLACE TABLE NonAuto_{data}_{stage} AS
-        WITH cte AS (
-            SELECT
-                id
-                , LOG(1 + LEAST("12m_call_history", 30)) AS _12m_call_history
-                , acq_method
-                , LOG(1 + LEAST(ann_prm_amt, 7200)) AS _ann_prm_amt
-                , IF(channel = 'Retail', 1, 0) AS _channel
-                , digital_contact_ind
-                , geo_group
-                , has_prior_carrier
-                , home_lot_sq_footage
-                , IF(household_group = '1dwelling', 1, 0) AS _household_group
-                , LEAST(household_policy_counts, 5) AS _household_policy_counts
-                , pol_edeliv_ind_filled
-                , prdct_sbtyp_grp
-                , product_sbtyp
-                , LOG(1 + LEAST(tenure_at_snapshot, 500)) AS _tenure_at_snapshot
-                , IF(trm_len_mo = 12, 1, 0) AS _trm_len_mo
-                {target_inner}
-            FROM NonAuto_{data}_imputed
-            {row_filter}
-        )
-        SELECT 
-            id AS id
-            , _12m_call_history AS "12m_call_history"
-            , acq_method AS acq_method
-            , _ann_prm_amt AS ann_prm_amt
-            , _channel AS channel
-            , digital_contact_ind AS digital_contact_ind
-            , geo_group AS geo_group
-            , has_prior_carrier AS has_prior_carrier
-            , home_lot_sq_footage AS home_lot_sq_footage
-            , _household_group AS household_group
-            , _household_policy_counts AS household_policy_counts
-            , pol_edeliv_ind_filled AS pol_edeliv_ind
-            , prdct_sbtyp_grp AS prdct_sbtyp_grp
-            , product_sbtyp AS product_sbtyp
-            , _tenure_at_snapshot AS tenure_at_snapshot
-            , _trm_len_mo AS trm_len_mo
-            {target_outer}
-        FROM cte;
+# Stage 1 (binary): all rows; train includes nonzero_call target
+for data in ["train", "test"]:
+    if data == "train":
+        target_inner = ", IF(call_counts > 0, 1, 0) AS nonzero_call"
+        target_outer = ", nonzero_call AS nonzero_call"
+    else:
+        target_inner = ""
+        target_outer = ""
 
-        """)
+    conn.execute(f"""
+    CREATE OR REPLACE TABLE NonAuto_{data}_binary AS
+    WITH cte AS (
+        SELECT
+            id
+            , LOG(1 + LEAST("12m_call_history", 30)) AS _12m_call_history
+            , acq_method
+            , LOG(1 + LEAST(ann_prm_amt, 7200)) AS _ann_prm_amt
+            , IF(channel = 'Retail', 1, 0) AS _channel
+            , digital_contact_ind
+            , geo_group
+            , has_prior_carrier
+            , home_lot_sq_footage
+            , IF(household_group = '1dwelling', 1, 0) AS _household_group
+            , LEAST(household_policy_counts, 5) AS _household_policy_counts
+            , pol_edeliv_ind_filled
+            , prdct_sbtyp_grp
+            , product_sbtyp
+            , LOG(1 + LEAST(tenure_at_snapshot, 500)) AS _tenure_at_snapshot
+            , IF(trm_len_mo = 12, 1, 0) AS _trm_len_mo
+            {target_inner}
+        FROM NonAuto_{data}_imputed
+    )
+    SELECT
+        id AS id
+        , _12m_call_history AS "12m_call_history"
+        , acq_method AS acq_method
+        , _ann_prm_amt AS ann_prm_amt
+        , _channel AS channel
+        , digital_contact_ind AS digital_contact_ind
+        , geo_group AS geo_group
+        , has_prior_carrier AS has_prior_carrier
+        , home_lot_sq_footage AS home_lot_sq_footage
+        , _household_group AS household_group
+        , _household_policy_counts AS household_policy_counts
+        , pol_edeliv_ind_filled AS pol_edeliv_ind
+        , prdct_sbtyp_grp AS prdct_sbtyp_grp
+        , product_sbtyp AS product_sbtyp
+        , _tenure_at_snapshot AS tenure_at_snapshot
+        , _trm_len_mo AS trm_len_mo
+        {target_outer}
+    FROM cte;
+    """)
+
+# Stage 2 (zero-truncated count): train filtered to call_counts > 0; test unfiltered
+for data in ["train", "test"]:
+    if data == "train":
+        target_inner = ", call_counts"
+        target_outer = ", call_counts AS call_counts"
+        row_filter = "WHERE call_counts > 0"
+    else:
+        target_inner = ""
+        target_outer = ""
+        row_filter = ""
+
+    conn.execute(f"""
+    CREATE OR REPLACE TABLE NonAuto_{data}_count AS
+    WITH cte AS (
+        SELECT
+            id
+            , LOG(1 + LEAST("12m_call_history", 30)) AS _12m_call_history
+            , acq_method
+            , LOG(1 + LEAST(ann_prm_amt, 7200)) AS _ann_prm_amt
+            , IF(channel = 'Retail', 1, 0) AS _channel
+            , digital_contact_ind
+            , geo_group
+            , has_prior_carrier
+            , home_lot_sq_footage
+            , IF(household_group = '1dwelling', 1, 0) AS _household_group
+            , LEAST(household_policy_counts, 3) AS _household_policy_counts_le3
+            , GREATEST(LEAST(household_policy_counts, 5) - 3, 0) AS _household_policy_counts_gt3
+            , pol_edeliv_ind_filled
+            , prdct_sbtyp_grp
+            , product_sbtyp
+            , LOG(1 + LEAST(tenure_at_snapshot, 300)) AS _tenure_at_snapshot_le300
+            , LOG(1 + GREATEST(LEAST(tenure_at_snapshot, 500) - 300, 0)) AS _tenure_at_snapshot_gt300
+            , IF(trm_len_mo = 12, 1, 0) AS _trm_len_mo
+            {target_inner}
+        FROM NonAuto_{data}_imputed
+        {row_filter}
+    )
+    SELECT
+        id AS id
+        , _12m_call_history AS "12m_call_history"
+        , acq_method AS acq_method
+        , _ann_prm_amt AS ann_prm_amt
+        , _channel AS channel
+        , digital_contact_ind AS digital_contact_ind
+        , geo_group AS geo_group
+        , has_prior_carrier AS has_prior_carrier
+        , home_lot_sq_footage AS home_lot_sq_footage
+        , _household_group AS household_group
+        , _household_policy_counts_le3 AS household_policy_counts_le3
+        , _household_policy_counts_gt3 AS household_policy_counts_gt3
+        , pol_edeliv_ind_filled AS pol_edeliv_ind
+        , prdct_sbtyp_grp AS prdct_sbtyp_grp
+        , product_sbtyp AS product_sbtyp
+        , _tenure_at_snapshot_le300 AS tenure_at_snapshot_le300
+        , _tenure_at_snapshot_gt300 AS tenure_at_snapshot_gt300
+        , _trm_len_mo AS trm_len_mo
+        {target_outer}
+    FROM cte;
+    """)
 
 
+
+#################### Step 2: Stage 1 - Logistic Regression Data Prep ####################
 nominal_cat = [
-    "acq_method", "geo_group", "pol_edeliv_ind", 
-    "prdct_sbtyp_grp", "product_sbtyp"
+    "acq_method", "geo_group", "pol_edeliv_ind",
+    "prdct_sbtyp_grp", "product_sbtyp",
 ]
 numeric_cols = [
     "12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
-    "household_policy_counts", "tenure_at_snapshot"
+    "household_policy_counts", "tenure_at_snapshot",
 ]
 
-#################### Step 2: Stage 1 - Logistic Regression Data Prep ####################
 train_binary = load_df(conn, "NonAuto_train_binary")
 test_binary = load_df(conn, "NonAuto_test_binary")
 
@@ -140,6 +193,16 @@ print(conn.execute("SHOW TABLES").fetchall())
 print("Stage 1 Binary Classification NonAuto Dataset Prep is done.")
 
 #################### Step 3: Stage 2 - Negative Binomial Data Prep ####################
+nominal_cat = [
+    "acq_method", "geo_group", "pol_edeliv_ind",
+    "prdct_sbtyp_grp", "product_sbtyp",
+]
+numeric_cols = [
+    "12m_call_history", "ann_prm_amt", "home_lot_sq_footage",
+    "household_policy_counts_le3", "household_policy_counts_gt3",
+    "tenure_at_snapshot_le300", "tenure_at_snapshot_gt300",
+]
+
 train_count_nb = load_df(conn, "NonAuto_train_count")
 test_count_nb = load_df(conn, "NonAuto_test_count")
 
